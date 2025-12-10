@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   FiShare2,
@@ -8,6 +8,7 @@ import {
   FiClock,
   FiUsers,
 } from 'react-icons/fi';
+import JsBarcode from 'jsbarcode';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import './style/BookingConfirmation.scss';
@@ -57,6 +58,7 @@ const BookingConfirmation = () => {
   const [booking, setBooking] = useState(location.state || defaultBooking);
   const [bookingHistory, setBookingHistory] = useState([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(true);
+  const barcodeRef = useRef(null);
 
   const formatCurrency = (value) => {
     if (value === undefined || value === null) return '-';
@@ -72,6 +74,29 @@ const BookingConfirmation = () => {
     }
     setBookingHistory(storedHistory);
   }, [location.state]);
+
+  // 바코드 생성
+  useEffect(() => {
+    if (barcodeRef.current && booking.bookingNumber) {
+      try {
+        // 기존 바코드 제거
+        barcodeRef.current.innerHTML = '';
+        // CSS 변수에서 테마 색상 가져오기
+        const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#2f6a57';
+        JsBarcode(barcodeRef.current, booking.bookingNumber, {
+          format: 'CODE128',
+          width: 2,
+          height: 40,
+          displayValue: false,
+          background: 'transparent',
+          lineColor: primaryColor,
+          margin: 0,
+        });
+      } catch (error) {
+        console.error('바코드 생성 실패:', error);
+      }
+    }
+  }, [booking.bookingNumber]);
 
   const breadcrumbItems = [
     booking.country || '대한민국',
@@ -227,9 +252,11 @@ const BookingConfirmation = () => {
               <div className="ticket-footer">
                 <div className="ticket-code">
                   <span className="label">예약 코드</span>
-                  <strong>{booking.bookingNumber}</strong>
+                  <div className="code-barcode-wrapper">
+                    <strong>{booking.bookingNumber}</strong>
+                    <svg ref={barcodeRef} className="barcode" />
+                  </div>
                 </div>
-                <div className="barcode">{booking.barcode}</div>
               </div>
 
               <div className="ticket-extra">
@@ -245,11 +272,11 @@ const BookingConfirmation = () => {
                     </div>
                     <div>
                       <dt>이메일</dt>
-                      <dd>{booking.guestEmail || '등록되지 않음'}</dd>
+                      <dd>{booking.guestEmail && booking.guestEmail.trim() ? booking.guestEmail : '등록되지 않음'}</dd>
                     </div>
                     <div>
                       <dt>연락처</dt>
-                      <dd>{booking.guestPhone || '-'}</dd>
+                      <dd>{booking.guestPhone && booking.guestPhone.trim() ? booking.guestPhone : '-'}</dd>
                     </div>
                     <div>
                       <dt>특별 요청</dt>

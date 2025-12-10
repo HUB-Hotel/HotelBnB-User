@@ -228,9 +228,6 @@
 }
 
 .ticket-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
   border-top: 0.1rem solid var(--border);
   padding-top: 1.6rem;
 
@@ -238,25 +235,34 @@
     .label {
       font-size: 1.2rem;
       color: var(--muted);
+      display: block;
+      margin-bottom: 0.8rem;
     }
 
-    strong {
-      font-size: 2.4rem;
-      color: var(--text);
+    .code-barcode-wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 2rem;
 
-      .ticket-number {
-        font-size: 1.6rem;
-        margin-left: 0.8rem;
-        color: var(--muted);
+      strong {
+        font-size: 2.4rem;
+        color: var(--text);
+        flex-shrink: 0;
+
+        .ticket-number {
+          font-size: 1.6rem;
+          margin-left: 0.8rem;
+          color: var(--muted);
+        }
+      }
+
+      .barcode {
+        flex-shrink: 0;
+        max-width: 20rem;
+        height: 4rem;
       }
     }
-  }
-
-  .barcode {
-    font-family: 'Courier New', monospace;
-    letter-spacing: 0.2rem;
-    font-size: 1.8rem;
-    color: var(--text);
   }
 }
 

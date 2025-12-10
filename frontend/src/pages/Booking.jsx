@@ -293,6 +293,13 @@ const Booking = () => {
     const bookingNumber = Date.now().toString().slice(-8);
     // 사용자 이름 가져오기 (displayName 또는 name)
     const userName = userInfo?.displayName || userInfo?.name || '게스트';
+    // 사용자 이메일과 전화번호 가져오기 (다양한 필드명 지원)
+    const userEmail = userInfo?.email || '';
+    // phoneNumber는 입력 필드 값 우선, 없으면 userInfo에서 찾기 (phoneNumber 또는 phone)
+    const userPhone = phoneNumber || userInfo?.phoneNumber || userInfo?.phone || '';
+    
+    console.log('📧 [Booking] 사용자 정보:', { userInfo, phoneNumber, userEmail, userPhone });
+    
     return {
       hotelName: hotel?.name || '해튼호텔',
       roomName: room ? `${room.name} - ${room.description}` : '객실 정보',
@@ -306,6 +313,8 @@ const Booking = () => {
       checkOutTime: '11:30pm',
       arrivalInfo: '결제 완료',
       guestName: userName,
+      guestEmail: userEmail,
+      guestPhone: userPhone,
       guestCount: guests,
       bookingNumber,
       barcode: '|| ||| | |||| |||',
@@ -313,7 +322,7 @@ const Booking = () => {
       bookingId: `${id || '1'}-${roomId || '1'}`,
       createdAt: new Date().toISOString(),
     };
-  }, [hotel?.name, hotel?.address, room, city, country, checkIn, checkOut, guests, roomId, total, id, userInfo]);
+  }, [hotel?.name, hotel?.address, room, city, country, checkIn, checkOut, guests, roomId, total, id, userInfo, phoneNumber]);
 
   const handleConfirmPayment = async () => {
     if (!checkIn || !checkOut) {
@@ -329,6 +338,9 @@ const Booking = () => {
       // actualRoom의 _id를 사용하거나, 없으면 roomId 사용
       const actualRoomId = actualRoom?._id || actualRoom?.id || roomId;
       
+      // 사용자 이름 가져오기
+      const userName = userInfo?.displayName || userInfo?.name || '게스트';
+      
       const bookingData = {
         lodgingId: id,
         roomId: actualRoomId,
@@ -337,7 +349,8 @@ const Booking = () => {
         guests: parseInt(guests) || 2,
         rooms: parseInt(rooms) || 1,
         price: total,
-        phone: phoneNumber || '',
+        userName: userName,
+        userPhone: phoneNumber || '',
         // 결제는 실제 포트원 연동 시 paymentId를 받아서 전달
         // 현재는 임시로 결제 완료 상태로 처리
         paymentId: `temp_${Date.now()}`,
@@ -348,6 +361,9 @@ const Booking = () => {
       
       // 예약 성공 시 payload 구성
       const payload = buildBookingPayload();
+      
+      // 디버깅: payload 확인
+      console.log('📋 [Booking] 예약 확인 페이지로 전달할 데이터:', payload);
       
       // 응답 데이터로 업데이트
       const bookingResponse = response.data || response.data?.data || response;
@@ -437,9 +453,6 @@ const Booking = () => {
                 <span className="date-label">체크인</span>
                 <span className="date-value">{checkIn ? formatDate(checkIn) : '날짜 선택'}</span>
               </div>
-            </div>
-            <div className="date-building-icon">
-              <div className="building-icon">🏢</div>
             </div>
             <div className="date-item">
               <FiCalendar />
