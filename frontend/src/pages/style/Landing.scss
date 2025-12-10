@@ -1,0 +1,29 @@
+.landing-page {
+  min-height: 100vh;
+  width: 100%;
+  background: var(--app-bg);
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  gap: 0;
+
+  // Header와 HeroSection 사이 간격 제거
+  > :nth-child(1) {
+    // Header
+    margin-bottom: 0;
+  }
+
+  > :nth-child(2) {
+    // HeroSection
+    margin-top: 0;
+    margin-bottom: 8rem;
+  }
+
+  // 나머지 섹션들 간격 유지
+  > :nth-child(3),
+  > :nth-child(4),
+  > :nth-child(5) {
+    margin-bottom: 8rem;
+  }
+}
+
