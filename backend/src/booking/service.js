@@ -21,42 +21,29 @@ const convertToObjectId = async (id, model, fieldName) => {
     throw { message: `유효하지 않은 ${fieldName}입니다: ${id}`, status: 400 };
 };
 
-// 1. 예약 생성 (그대로 유지)
+// 1. 예약 생성
 exports.createBookingService = async (userId, data) => {
     const { lodgingId, roomId, checkIn, checkOut, price, userName, userPhone, paymentKey, paymentAmount } = data;
-
-    console.log(`👉 [Service] 예약 생성 시작. userId: ${userId}, lodgingId: ${lodgingId}, roomId: ${roomId}`);
 
     // userId가 ObjectId 형식인지 확인하고 변환
     let actualUserId = userId;
     if (!mongoose.Types.ObjectId.isValid(userId)) {
-        console.error(`❌ [Service] 유효하지 않은 userId: ${userId}`);
         throw { message: `유효하지 않은 사용자 ID입니다: ${userId}`, status: 400 };
     }
 
     // 숫자 ID를 ObjectId로 변환
     let actualLodgingId, actualRoomId;
     try {
-        console.log(`👉 [Service] ID 변환 시작. lodgingId: ${lodgingId}, roomId: ${roomId}`);
         actualLodgingId = await convertToObjectId(lodgingId, Lodging, '숙소');
         actualRoomId = await convertToObjectId(roomId, Room, '객실');
-        console.log(`✅ [Service] ID 변환 완료. actualLodgingId: ${actualLodgingId}, actualRoomId: ${actualRoomId}`);
     } catch (err) {
-        console.error(`❌ [Service] ID 변환 실패:`, err);
         throw err;
     }
 
-    console.log(`👉 [Service] Room 조회 시도. ID: ${actualRoomId}`);
-
     const room = await Room.findById(actualRoomId);
-
-    console.log("👉 [Service] DB에서 찾은 Room 정보:", room);
-
     if (!room) throw { message: "객실을 찾을 수 없습니다.", status: 404 };
 
     const totalStock = room.countRoom;
-
-    console.log(`👉 [Service] 날짜 변환 확인. CheckIn: ${new Date(checkIn)}, CheckOut: ${new Date(checkOut)}`);
 
     const existingBookingsCount = await Booking.countDocuments({
         roomId: actualRoomId,
@@ -68,29 +55,15 @@ exports.createBookingService = async (userId, data) => {
         ]
     });
 
-    console.log(`👉 [Service] 예약된 수: ${existingBookingsCount}, 전체 재고: ${totalStock}`);
-
     if (existingBookingsCount >= totalStock) {
         throw { message: "해당 날짜에 객실이 모두 매진되었습니다.", status: 400 };
     }
 
-    console.log(`👉 [Service] 예약 데이터 생성 시작`);
-    console.log(`   - userId: ${actualUserId}`);
-    console.log(`   - lodgingId: ${actualLodgingId}`);
-    console.log(`   - roomId: ${actualRoomId}`);
-    console.log(`   - userName: ${userName}`);
-    console.log(`   - userPhone: ${userPhone}`);
-    console.log(`   - checkIn: ${checkIn}`);
-    console.log(`   - checkOut: ${checkOut}`);
-    console.log(`   - price: ${price}`);
-
     const newBooking = await Booking.create({
         userId: actualUserId, lodgingId: actualLodgingId, roomId: actualRoomId, userName, userPhone, checkIn, checkOut, price,
-        status: "confirmed", // 예약 생성 시 바로 확정
+        status: "confirmed",
         paymentKey, paymentAmount
     });
-
-    console.log("👉 [Service] 예약 생성 완료!");
 
     return newBooking;
 };

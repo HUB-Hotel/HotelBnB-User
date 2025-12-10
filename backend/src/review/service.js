@@ -42,13 +42,9 @@ exports.createReviewService = async (userId, data) => {
         
         // 데이터 갱신
         lodging.reviewCount = newCount;
-        lodging.rating = parseFloat(newRating.toFixed(1)); // 소수점 1자리로 자름
+        lodging.rating = parseFloat(newRating.toFixed(1));
         
         await lodging.save();
-        
-        console.log(`✅ 숙소 평점 업데이트 완료: ${lodging.name} (평점: ${lodging.rating}, 개수: ${lodging.reviewCount})`);
-    } else {
-        console.log("❌ 숙소를 찾을 수 없어 평점을 업데이트하지 못했습니다.");
     }
 
     // (6) populate된 리뷰 반환

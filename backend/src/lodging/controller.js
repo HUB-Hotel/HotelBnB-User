@@ -37,7 +37,6 @@ exports.getLodgings = async (req, res) => {
     res.status(200).json(successResponse(lodgings || [], `${lodgings.length}개 발견`));
 
   } catch (err) {
-    console.error("숙소 목록 조회 에러:", err);
     res.status(500).json(errorResponse(err.message || "숙소 목록 조회 실패", 500));
   }
 };
@@ -56,7 +55,6 @@ exports.getLodgingDetail = async (req, res) => {
 
     res.status(200).json(successResponse(lodging, "숙소 상세 조회 성공"));
   } catch (err) {
-    console.error(err);
     res.status(500).json(errorResponse("잘못된 요청입니다. (ID 형식을 확인하세요)", 500));
   }
 };
