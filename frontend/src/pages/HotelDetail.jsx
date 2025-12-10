@@ -5,13 +5,24 @@ import { addDays, format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { FiHeart, FiShare2, FiMapPin, FiUsers, FiClock, FiChevronLeft, FiChevronRight, FiWifi, FiCalendar } from 'react-icons/fi';
 import { MdPool, MdSpa, MdRestaurant, MdRoomService, MdFitnessCenter, MdLocalBar, MdCoffee, MdBusinessCenter, MdLocalParking, MdAirportShuttle, MdCancel, MdPets, MdSmokingRooms, MdHotTub, MdBeachAccess, MdGolfCourse, MdCasino, MdShoppingCart, MdLocalLaundryService, MdRoom, MdElevator, MdSecurity, MdSupportAgent, MdChildCare } from 'react-icons/md';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import L from 'leaflet';
 import { getFavorites, addFavorite, removeFavorite } from '../api/favoriteApi';
 import { getErrorMessage } from '../api/client';
 import { allHotelsData } from './SearchResults';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import 'react-day-picker/dist/style.css';
+import 'leaflet/dist/leaflet.css';
 import './style/HotelDetail.scss';
+
+// Leaflet 마커 아이콘 설정
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+});
 
 // 객실 데이터 (예시)
 const generateRooms = (hotelId) => {
@@ -311,8 +322,8 @@ const HotelDetail = () => {
   const calendarRef = useRef(null);
   const guestRef = useRef(null);
   const roomsSectionRef = useRef(null);
-  const mapContainerRef = useRef(null);
-  const mapRef = useRef(null);
+  const [mapPosition, setMapPosition] = useState([37.5665, 126.9780]); // 기본값: 서울
+  const [mapKey, setMapKey] = useState(0); // 지도 강제 리렌더링용
 
   const hotel = useMemo(() => {
     return allHotelsData.find((h) => h.id === parseInt(id));
@@ -511,53 +522,49 @@ const HotelDetail = () => {
     checkFavoriteStatus();
   }, [hotel?.id]);
 
-  // 카카오 맵 초기화
+  // 주소를 좌표로 변환 (OpenStreetMap Nominatim API 사용)
   useEffect(() => {
-    if (!hotel?.address || !mapContainerRef.current) return;
+    if (!hotel?.address) return;
 
-    // 카카오 맵 SDK가 로드되었는지 확인
-    if (typeof window.kakao === 'undefined' || !window.kakao.maps) {
-      console.warn('카카오 맵 SDK가 로드되지 않았습니다.');
-      return;
-    }
-
-    // 기존 지도가 있으면 제거
-    if (mapRef.current) {
-      mapRef.current = null;
-    }
-
-    // 주소를 좌표로 변환
-    const geocoder = new window.kakao.maps.services.Geocoder();
-    geocoder.addressSearch(hotel.address, (result, status) => {
-      if (status === window.kakao.maps.services.Status.OK) {
-        const coords = new window.kakao.maps.LatLng(result[0].y, result[0].x);
-
-        // 지도 생성
-        const mapOption = {
-          center: coords,
-          level: 3, // 지도의 확대 레벨
-        };
-
-        const map = new window.kakao.maps.Map(mapContainerRef.current, mapOption);
-
-        // 마커 생성
-        const marker = new window.kakao.maps.Marker({
-          position: coords,
-        });
-        marker.setMap(map);
-
-        // 인포윈도우 생성
-        const infowindow = new window.kakao.maps.InfoWindow({
-          content: `<div style="width:150px;text-align:center;padding:6px 0;">${hotel.name}</div>`,
-        });
-        infowindow.open(map, marker);
-
-        mapRef.current = map;
-      } else {
-        console.error('주소 검색 실패:', status);
+    const geocodeAddress = async () => {
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(hotel.address)}&limit=1`,
+          {
+            headers: {
+              'User-Agent': 'HotelBnB-User/1.0'
+            }
+          }
+        );
+        const data = await response.json();
+        
+        if (data && data.length > 0) {
+          const lat = parseFloat(data[0].lat);
+          const lon = parseFloat(data[0].lon);
+          setMapPosition([lat, lon]);
+          setMapKey(prev => prev + 1); // 지도 강제 리렌더링
+          console.log('주소 검색 성공, 좌표:', [lat, lon]);
+        } else {
+          console.warn('주소를 찾을 수 없습니다. 기본 좌표 사용:', hotel.address);
+          setMapPosition([37.5665, 126.9780]); // 기본값: 서울
+        }
+      } catch (error) {
+        console.error('주소 검색 중 오류:', error);
+        setMapPosition([37.5665, 126.9780]); // 기본값: 서울
       }
-    });
-  }, [hotel?.address, hotel?.name]);
+    };
+
+    geocodeAddress();
+  }, [hotel?.address]);
+
+  // 지도 중심 업데이트 컴포넌트
+  const MapUpdater = ({ position }) => {
+    const map = useMap();
+    useEffect(() => {
+      map.setView(position, 13);
+    }, [map, position]);
+    return null;
+  };
 
   const handleHeartClick = async () => {
     if (!hotel?.id) return;
@@ -967,23 +974,33 @@ const HotelDetail = () => {
         <section className="map-section">
           <h2 className="section-title">지도보기</h2>
           <div className="map-container">
-            <iframe
-              src={`https://www.google.com/maps/embed/v1/place?key=AIzaSyBFw0Qbyq9zTFTd-tUY6d-s6U4UZu3x9iY&q=${encodeURIComponent(hotel.address)}`}
-              width="100%"
-              height="400"
-              style={{ border: 0 }}
-              allowFullScreen=""
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-              title={`${hotel.name} 위치`}
-            ></iframe>
+            <MapContainer
+              key={mapKey}
+              center={mapPosition}
+              zoom={13}
+              style={{ height: '400px', width: '100%', zIndex: 0 }}
+              scrollWheelZoom={true}
+            >
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              <MapUpdater position={mapPosition} />
+              <Marker position={mapPosition}>
+                <Popup>
+                  <strong>{hotel.name}</strong>
+                  <br />
+                  {hotel.address}
+                </Popup>
+              </Marker>
+            </MapContainer>
             <a
-              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(hotel.address)}`}
+              href={`https://www.openstreetmap.org/?mlat=${mapPosition[0]}&mlon=${mapPosition[1]}&zoom=15`}
               target="_blank"
               rel="noopener noreferrer"
-              className="view-google-maps"
+              className="view-map-link"
             >
-              View on google maps
+              OpenStreetMap에서 보기
             </a>
           </div>
           <p className="map-address">
