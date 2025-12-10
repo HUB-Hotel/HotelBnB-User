@@ -8,6 +8,7 @@ import { MdPool, MdSpa, MdRestaurant, MdRoomService, MdFitnessCenter, MdLocalBar
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { getFavorites, addFavorite, removeFavorite } from '../api/favoriteApi';
+import { getLodgingReviews, createReview } from '../api/reviewApi';
 import { getErrorMessage } from '../api/client';
 import { allHotelsData } from './SearchResults';
 import Header from '../components/Header';
@@ -307,6 +308,12 @@ const HotelDetail = () => {
   const [showAllAmenities, setShowAllAmenities] = useState(false);
   const [visibleRoomsCount, setVisibleRoomsCount] = useState(4);
   const reviewsPerPage = 3;
+  const [reviews, setReviews] = useState([]);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewContent, setReviewContent] = useState('');
+  const [reviewBookingId, setReviewBookingId] = useState(null);
+  const [userBookings, setUserBookings] = useState([]);
 
   // 날짜 및 게스트 선택 상태
   const [dateRange, setDateRange] = useState({
@@ -338,8 +345,8 @@ const HotelDetail = () => {
   }, [allRooms, guestOption.guests]);
 
   const visibleRooms = useMemo(() => filteredRooms.slice(0, visibleRoomsCount), [filteredRooms, visibleRoomsCount]);
-  const reviews = useMemo(() => generateReviews(parseInt(id)), [id]);
-  const actualReviewCount = reviews.length;
+  const mockReviews = useMemo(() => generateReviews(parseInt(id)), [id]);
+  const actualReviewCount = reviews.length || mockReviews.length;
 
   const handleLoadMoreRooms = () => {
     setVisibleRoomsCount((prev) => Math.min(prev + 4, filteredRooms.length));
@@ -414,11 +421,12 @@ const HotelDetail = () => {
   ];
 
   const paginatedReviews = useMemo(() => {
+    const reviewsToShow = reviews.length > 0 ? reviews : mockReviews;
     const start = (currentReviewPage - 1) * reviewsPerPage;
-    return reviews.slice(start, start + reviewsPerPage);
-  }, [reviews, currentReviewPage]);
+    return reviewsToShow.slice(start, start + reviewsPerPage);
+  }, [reviews, mockReviews, currentReviewPage]);
 
-  const totalReviewPages = Math.ceil(reviews.length / reviewsPerPage);
+  const totalReviewPages = Math.ceil((reviews.length > 0 ? reviews.length : mockReviews.length) / reviewsPerPage);
 
   const checkIn = dateRange?.from;
   const checkOut = dateRange?.to;
@@ -1054,25 +1062,51 @@ const HotelDetail = () => {
                 </div>
               ))}
             </div>
-            <button className="btn secondary">리뷰 작성하기</button>
+            <button 
+              className="btn secondary"
+              onClick={() => {
+                if (userBookings.length === 0) {
+                  alert('리뷰를 작성하려면 먼저 예약을 완료해야 합니다.');
+                  return;
+                }
+                setIsReviewModalOpen(true);
+                if (userBookings.length === 1) {
+                  setReviewBookingId(userBookings[0]._id || userBookings[0].id);
+                }
+              }}
+            >
+              리뷰 작성하기
+            </button>
           </div>
           <div className="reviews-list">
-            {paginatedReviews.map((review) => (
-              <div key={review.id} className="review-item">
-                <div className="review-header">
-                  <img src={review.userAvatar} alt={review.userName} className="review-avatar" />
-                  <div className="review-user-info">
-                    <span className="review-user-name">{review.userName}</span>
-                    <div className="review-rating">
-                      <span className="review-rating-score">{review.rating}</span>
-                      <span className="review-rating-text">{review.ratingText}</span>
+            {paginatedReviews.map((review, idx) => {
+              const reviewId = review._id || review.id || idx;
+              const userName = review.userId?.name || review.userId?.displayName || review.userName || '익명';
+              const userEmail = review.userId?.email || '';
+              const avatar = review.userAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=random`;
+              const rating = review.rating || 5;
+              const content = review.content || review.review || '';
+              const date = review.createdAt ? new Date(review.createdAt).toLocaleDateString('ko-KR') : (review.date || '');
+              
+              return (
+                <div key={reviewId} className="review-item">
+                  <div className="review-header">
+                    <img src={avatar} alt={userName} className="review-avatar" />
+                    <div className="review-user-info">
+                      <span className="review-user-name">{userName}</span>
+                      <div className="review-rating">
+                        <span className="review-rating-score">{rating}</span>
+                        <span className="review-rating-text">
+                          {rating >= 4.5 ? '최고' : rating >= 4 ? '훌륭함' : rating >= 3.5 ? '좋음' : rating >= 3 ? '보통' : '나쁨'}
+                        </span>
+                      </div>
                     </div>
                   </div>
+                  <p className="review-text">{content}</p>
+                  <span className="review-date">{date}</span>
                 </div>
-                <p className="review-text">{review.review}</p>
-                <span className="review-date">{review.date}</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
           {totalReviewPages > 1 && (
             <div className="reviews-pagination">
@@ -1201,6 +1235,94 @@ const HotelDetail = () => {
                   />
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Review Modal */}
+      {isReviewModalOpen && (
+        <div className="modal-overlay" onClick={() => setIsReviewModalOpen(false)}>
+          <div className="modal-content review-modal" onClick={(e) => e.stopPropagation()}>
+            <h2>리뷰 작성</h2>
+            {userBookings.length > 1 && (
+              <div className="form-group">
+                <label>예약 선택</label>
+                <select
+                  value={reviewBookingId || ''}
+                  onChange={(e) => setReviewBookingId(e.target.value)}
+                  className="form-input"
+                >
+                  <option value="">예약을 선택하세요</option>
+                  {userBookings.map((booking) => (
+                    <option key={booking._id || booking.id} value={booking._id || booking.id}>
+                      {booking.checkIn} ~ {booking.checkOut}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div className="form-group">
+              <label>평점</label>
+              <div className="rating-input">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    type="button"
+                    className={`star-button ${star <= reviewRating ? 'active' : ''}`}
+                    onClick={() => setReviewRating(star)}
+                  >
+                    ★
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="form-group">
+              <label>리뷰 내용</label>
+              <textarea
+                value={reviewContent}
+                onChange={(e) => setReviewContent(e.target.value)}
+                className="form-input"
+                rows={5}
+                placeholder="숙소에 대한 솔직한 리뷰를 작성해주세요."
+              />
+            </div>
+            <div className="modal-actions">
+              <button className="btn secondary" onClick={() => setIsReviewModalOpen(false)}>
+                취소
+              </button>
+              <button
+                className="btn primary"
+                onClick={async () => {
+                  if (!reviewBookingId) {
+                    alert('예약을 선택해주세요.');
+                    return;
+                  }
+                  if (!reviewContent.trim()) {
+                    alert('리뷰 내용을 입력해주세요.');
+                    return;
+                  }
+                  try {
+                    await createReview({
+                      bookingId: reviewBookingId,
+                      rating: reviewRating,
+                      content: reviewContent,
+                    });
+                    alert('리뷰가 작성되었습니다.');
+                    setIsReviewModalOpen(false);
+                    setReviewContent('');
+                    setReviewRating(5);
+                    // 리뷰 목록 새로고침
+                    const response = await getLodgingReviews(hotel.id.toString());
+                    const reviewsData = response.data || response.data?.data || response || [];
+                    setReviews(Array.isArray(reviewsData) ? reviewsData : []);
+                  } catch (err) {
+                    alert(getErrorMessage(err, '리뷰 작성에 실패했습니다.'));
+                  }
+                }}
+              >
+                작성하기
+              </button>
             </div>
           </div>
         </div>

@@ -97,7 +97,10 @@ exports.createBookingService = async (userId, data) => {
 
 // 2. 내 예약 목록 조회 (🚨 여기를 수정했습니다!)
 exports.getMyBookingsService = async (userId) => {
-    return await Booking.find({ userId })
+    return await Booking.find({ 
+        userId,
+        status: { $ne: "cancelled" } // 취소된 예약 제외
+    })
         .populate("lodgingId") // ✅ 특정 필드만 가져오지 말고 통째로 가져오는 게 안전합니다.
         .populate("roomId")    // ✅ 룸 정보도 통째로 가져옴 (roomName, roomImage 등 필요하니까)
         .sort({ createdAt: -1 }); // 최신순 정렬
