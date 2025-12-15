@@ -6,6 +6,7 @@
   flex-direction: column;
   padding: 0;
   gap: 0;
+  margin-bottom: 0;
 
   // Header와 HeroSection 사이 간격 제거
   > :nth-child(1) {
@@ -21,9 +22,13 @@
 
   // 나머지 섹션들 간격 유지
   > :nth-child(3),
-  > :nth-child(4),
-  > :nth-child(5) {
+  > :nth-child(4) {
     margin-bottom: 8rem;
+  }
+
+  // Footer는 마지막 요소이므로 하단 여백 제거
+  > :nth-child(5) {
+    margin-bottom: 0;
   }
 }
 

@@ -15,13 +15,24 @@ exports.registerService = async (data) => {
     // ... (회원가입 코드는 기존과 동일) ...
     const { email, password, name, role, phoneNumber, address, birthDate, profileImage } = data;
 
-    if (await User.findOne({ email: email.toLowerCase() })) throw { status: 400, message: "이미 가입된 이메일" };
-    if (phoneNumber && await User.findOne({ phoneNumber })) throw { status: 400, message: "이미 가입된 번호" };
+    // 입력값 검증
+    if (!email || !email.trim()) throw { status: 400, message: "이메일을 입력해주세요." };
+    if (!password || !password.trim()) throw { status: 400, message: "비밀번호를 입력해주세요." };
+    if (!name || !name.trim()) throw { status: 400, message: "이름을 입력해주세요." };
+
+    if (await User.findOne({ email: email.toLowerCase() })) throw { status: 400, message: "이미 가입된 이메일입니다." };
+    if (phoneNumber && await User.findOne({ phoneNumber })) throw { status: 400, message: "이미 가입된 전화번호입니다." };
 
     const passwordHash = await bcrypt.hash(password, 10);
     const user = await User.create({
-        email, passwordHash, name, role, phoneNumber,
-        address, birthDate, profileImage,
+        email: email.toLowerCase().trim(), 
+        passwordHash, 
+        name: name.trim(), 
+        role, 
+        phoneNumber: phoneNumber?.trim(), 
+        address: address?.trim(), 
+        birthDate, 
+        profileImage,
         provider: 'local'
     });
 

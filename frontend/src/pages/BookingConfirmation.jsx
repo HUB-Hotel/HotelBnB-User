@@ -67,6 +67,17 @@ const BookingConfirmation = () => {
   const [hasNoBookings, setHasNoBookings] = useState(false);
   const barcodeRef = useRef(null);
 
+  // 로그인 상태 확인
+  useEffect(() => {
+    const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+    const token = localStorage.getItem('token');
+
+    if (!isLoggedIn || !token) {
+      navigate('/login', { replace: true });
+      return;
+    }
+  }, [navigate]);
+
   const formatCurrency = (value) => {
     if (value === undefined || value === null) return '-';
     return `₩${Number(value).toLocaleString()}`;

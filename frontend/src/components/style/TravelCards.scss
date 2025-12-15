@@ -2,7 +2,7 @@
 
 .section {
   width: 100%;
-  padding: 0 5%;
+  padding: 1rem 5% 0; // 상단에 여백 추가 (카드 호버 시 잘리지 않도록)
   display: flex;
   flex-direction: column;
   gap: 3.2rem;
@@ -42,8 +42,11 @@
 
 .card-wrapper {
   flex: 1;
-  overflow: hidden;
+  overflow-x: hidden; // 가로 스크롤은 숨김
+  overflow-y: visible; // 세로는 보이도록 (카드 호버 시 위로 올라갈 수 있도록)
   position: relative;
+  padding-top: 1rem; // 카드가 위로 올라갈 때 잘리지 않도록 여백 추가
+  margin-top: -1rem; // 레이아웃에 영향을 주지 않도록 마진으로 보정
 }
 
 .card-slider {

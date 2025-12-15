@@ -28,6 +28,17 @@ const Booking = () => {
   const [couponMessage, setCouponMessage] = useState('');
   const [discountAmount, setDiscountAmount] = useState(0);
   const [isSummaryVisible, setIsSummaryVisible] = useState(false);
+
+  // 로그인 상태 확인
+  useEffect(() => {
+    const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+    const token = localStorage.getItem('token');
+
+    if (!isLoggedIn || !token) {
+      navigate('/login', { replace: true });
+      return;
+    }
+  }, [navigate]);
   const [isAddCardModalOpen, setIsAddCardModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);

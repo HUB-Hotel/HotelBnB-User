@@ -12,7 +12,7 @@ const SignUp = () => {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
-    email: 'john.doe@gmail.com',
+    email: '',
     phone: '',
     password: '',
     confirmPassword: '',
@@ -55,6 +55,27 @@ const SignUp = () => {
     e.preventDefault();
     setError('');
 
+    // 입력값 검증
+    if (!formData.firstName || !formData.firstName.trim()) {
+      setError('이름을 입력해주세요.');
+      return;
+    }
+
+    if (!formData.lastName || !formData.lastName.trim()) {
+      setError('성을 입력해주세요.');
+      return;
+    }
+
+    if (!formData.email || !formData.email.trim()) {
+      setError('이메일을 입력해주세요.');
+      return;
+    }
+
+    if (!formData.password || !formData.password.trim()) {
+      setError('비밀번호를 입력해주세요.');
+      return;
+    }
+
     if (formData.password !== formData.confirmPassword) {
       setError('비밀번호가 일치하지 않습니다.');
       return;
@@ -67,11 +88,11 @@ const SignUp = () => {
 
     try {
       // 실제 회원가입 API 호출
-      const name = `${formData.firstName} ${formData.lastName}`.trim();
+      const name = `${formData.firstName.trim()} ${formData.lastName.trim()}`.trim();
       const response = await signup({
         name,
-        email: formData.email,
-        phone: formData.phone,
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
         password: formData.password,
       });
 

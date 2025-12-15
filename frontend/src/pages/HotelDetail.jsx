@@ -9,6 +9,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { getFavorites, addFavorite, removeFavorite } from '../api/favoriteApi';
 import { getLodgingReviews, createReview } from '../api/reviewApi';
+import { getHotelDetail } from '../api/hotelApi';
 import { getErrorMessage } from '../api/client';
 import { allHotelsData } from './SearchResults';
 import Header from '../components/Header';
@@ -299,6 +300,8 @@ const hotelFeatures = [
 const HotelDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [hotel, setHotel] = useState(null);
+  const [hotelLoading, setHotelLoading] = useState(true);
   const [isFavorited, setIsFavorited] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [currentReviewPage, setCurrentReviewPage] = useState(1);
@@ -332,8 +335,52 @@ const HotelDetail = () => {
   const [mapPosition, setMapPosition] = useState([37.5665, 126.9780]); // 기본값: 서울
   const [mapKey, setMapKey] = useState(0); // 지도 강제 리렌더링용
 
-  const hotel = useMemo(() => {
-    return allHotelsData.find((h) => h.id === parseInt(id));
+  // DB에서 호텔 정보 불러오기
+  useEffect(() => {
+    const loadHotel = async () => {
+      if (!id) return;
+      
+      setHotelLoading(true);
+      try {
+        const response = await getHotelDetail(id);
+        const hotelData = response.data || response.data?.data || response;
+        
+        if (hotelData) {
+          // DB 데이터를 프론트엔드 형식에 맞게 변환
+          const formattedHotel = {
+            id: hotelData._id || hotelData.id || parseInt(id),
+            name: hotelData.lodgingName || hotelData.name || '',
+            price: hotelData.price || 0,
+            address: hotelData.address || '',
+            destination: hotelData.location || hotelData.destination || '',
+            type: hotelData.type || 'hotel',
+            starRating: hotelData.starRating || 5,
+            amenitiesCount: hotelData.amenities?.length || 0,
+            reviewScore: hotelData.averageRating || 0, // DB에서 계산된 평균 평점
+            reviewText: 'Very Good', // 나중에 평점에 따라 계산
+            reviewCount: hotelData.reviewCount || 0,
+            image: hotelData.images?.[0] || hotelData.image || '',
+            imageCount: hotelData.images?.length || 0,
+            freebies: hotelData.freebies || { breakfast: false, parking: false, wifi: false, shuttle: false, cancellation: false },
+            amenities: hotelData.amenities || { frontDesk: true, aircon: true, fitness: false, pool: false },
+          };
+          setHotel(formattedHotel);
+        } else {
+          // DB에 없으면 하드코딩된 데이터에서 찾기 (fallback)
+          const fallbackHotel = allHotelsData.find((h) => h.id === parseInt(id));
+          setHotel(fallbackHotel || null);
+        }
+      } catch (err) {
+        console.error('Failed to load hotel', err);
+        // 에러 발생 시 하드코딩된 데이터에서 찾기 (fallback)
+        const fallbackHotel = allHotelsData.find((h) => h.id === parseInt(id));
+        setHotel(fallbackHotel || null);
+      } finally {
+        setHotelLoading(false);
+      }
+    };
+
+    loadHotel();
   }, [id]);
 
   const allRooms = useMemo(() => generateRooms(parseInt(id)), [id]);
@@ -348,9 +395,58 @@ const HotelDetail = () => {
   const mockReviews = useMemo(() => generateReviews(parseInt(id)), [id]);
   const actualReviewCount = reviews.length || mockReviews.length;
 
+  // 실제 리뷰 데이터에서 평균 평점 계산
+  const actualAverageRating = useMemo(() => {
+    if (reviews.length === 0) {
+      // 리뷰가 없으면 mockReviews의 평균 또는 hotel.reviewScore 사용
+      if (mockReviews.length > 0) {
+        const sum = mockReviews.reduce((acc, review) => acc + (review.rating || 0), 0);
+        return sum / mockReviews.length;
+      }
+      return hotel?.reviewScore || 0;
+    }
+    const sum = reviews.reduce((acc, review) => acc + (review.rating || 0), 0);
+    return sum / reviews.length;
+  }, [reviews, mockReviews, hotel?.reviewScore]);
+
+  // 평점 텍스트 변환 함수
+  const getRatingText = (rating) => {
+    if (rating >= 4.5) return '최고';
+    if (rating >= 4) return '훌륭함';
+    if (rating >= 3.5) return '좋음';
+    if (rating >= 3) return '보통';
+    return '나쁨';
+  };
+
   const handleLoadMoreRooms = () => {
     setVisibleRoomsCount((prev) => Math.min(prev + 4, filteredRooms.length));
   };
+
+  // 페이지 진입 시 스크롤 최상단으로 이동
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [id]); // id가 변경될 때마다 (다른 호텔로 이동할 때)
+
+  // DB에서 리뷰 데이터 불러오기
+  useEffect(() => {
+    const loadReviews = async () => {
+      if (!hotel?.id) return;
+      
+      try {
+        const response = await getLodgingReviews(hotel.id.toString());
+        const reviewsData = response.data || response.data?.data || response || [];
+        setReviews(Array.isArray(reviewsData) ? reviewsData : []);
+      } catch (err) {
+        console.error('Failed to load reviews', err);
+        // 에러 발생 시 빈 배열로 설정 (mockReviews 사용)
+        setReviews([]);
+      }
+    };
+
+    if (hotel && !hotelLoading) {
+      loadReviews();
+    }
+  }, [hotel?.id, hotelLoading]);
 
   // 게스트 수가 변경되면 visibleRoomsCount 리셋
   useEffect(() => {
@@ -688,8 +784,8 @@ const HotelDetail = () => {
               <div className="hotel-stars">{renderStars(hotel.starRating)}</div>
             </div>
             <div className="hotel-rating-section">
-              <span className="rating-score">{hotel.reviewScore}</span>
-              <span className="rating-text">{hotel.reviewText}</span>
+              <span className="rating-score">{actualAverageRating.toFixed(1)}</span>
+              <span className="rating-text">{getRatingText(actualAverageRating)}</span>
               <span className="rating-count">{actualReviewCount}개 리뷰</span>
             </div>
             <p className="hotel-address">
@@ -1047,16 +1143,16 @@ const HotelDetail = () => {
             {/* 해시태그 형식의 특징 */}
             <div className="features-tags">
               <div className="main-rating-card">
-                <div className="rating-score-large">{hotel.reviewScore}</div>
-                <div className="rating-text-large">{hotel.reviewText}</div>
+                <div className="rating-score-large">{actualAverageRating.toFixed(1)}</div>
+                <div className="rating-text-large">{getRatingText(actualAverageRating)}</div>
                 <div className="rating-count-small">{actualReviewCount}개 리뷰</div>
               </div>
               {hotelFeatures.map((feature) => (
                 <div key={feature.id} className="feature-tag">
                   <span className="tag-text">{feature.tag}</span>
                   <div className="tag-rating">
-                    <span className="tag-rating-score">{feature.rating}</span>
-                    <span className="tag-rating-text">{hotel.reviewText}</span>
+                    <span className="tag-rating-score">{actualAverageRating.toFixed(1)}</span>
+                    <span className="tag-rating-text">{getRatingText(actualAverageRating)}</span>
                     <span className="tag-rating-count">{actualReviewCount}개 리뷰</span>
                   </div>
                 </div>

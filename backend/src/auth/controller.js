@@ -1,12 +1,60 @@
 const authService = require("./service");
 const { successResponse, errorResponse } = require("../common/response");
 
+// MongoDB validation 에러를 사용자 친화적인 메시지로 변환
+const formatValidationError = (error) => {
+    if (error.name === 'ValidationError') {
+        const errors = Object.values(error.errors);
+        const firstError = errors[0];
+        
+        // 필드명을 한국어로 매핑
+        const fieldMap = {
+            'name': '이름',
+            'email': '이메일',
+            'passwordHash': '비밀번호',
+            'phoneNumber': '전화번호'
+        };
+        
+        const fieldName = fieldMap[firstError.path] || firstError.path;
+        
+        if (firstError.kind === 'required') {
+            return `${fieldName}을(를) 입력해주세요.`;
+        } else if (firstError.kind === 'unique') {
+            return `이미 사용 중인 ${fieldName}입니다.`;
+        } else if (firstError.kind === 'regexp' || firstError.kind === 'user defined') {
+            return firstError.message || `${fieldName} 형식이 올바르지 않습니다.`;
+        }
+        
+        return firstError.message || `${fieldName} 입력값을 확인해주세요.`;
+    }
+    
+    // MongoDB duplicate key 에러 처리
+    if (error.code === 11000) {
+        const field = Object.keys(error.keyPattern)[0];
+        const fieldMap = {
+            'email': '이메일',
+            'phoneNumber': '전화번호',
+            'kakaoId': '카카오 계정',
+            'googleId': '구글 계정'
+        };
+        const fieldName = fieldMap[field] || field;
+        return `이미 사용 중인 ${fieldName}입니다.`;
+    }
+    
+    return null;
+};
+
 exports.register = async (req, res) => {
     try {
         const data = await authService.registerService(req.body);
         res.status(201).json(successResponse(data, "회원가입 완료", 201));
     } catch (err) {
-        res.status(err.status || 500).json(errorResponse(err.message, err.status || 500));
+        // MongoDB validation 에러를 사용자 친화적인 메시지로 변환
+        const friendlyMessage = formatValidationError(err);
+        const errorMessage = friendlyMessage || err.message || '회원가입에 실패했습니다.';
+        const statusCode = err.status || 500;
+        
+        res.status(statusCode).json(errorResponse(errorMessage, statusCode));
     }
 };
 

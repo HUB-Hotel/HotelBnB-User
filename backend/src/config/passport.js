@@ -24,29 +24,65 @@ passport.use(new KakaoStrategy({
     try {
         const kakaoId = profile.id;
         const email = profile._json?.kakao_account?.email;
-        const displayName = profile.displayName || "카카오유저";
-        const photoUrl = profile._json?.properties?.profile_image;
+        
+        // 카카오 API 응답 구조에 맞게 닉네임 가져오기 (우선순위 순서)
+        const nickname = profile._json?.kakao_account?.profile?.nickname 
+            || profile._json?.properties?.nickname 
+            || profile.displayName 
+            || "카카오유저";
+        
+        // 프로필 이미지 가져오기
+        const photoUrl = profile._json?.kakao_account?.profile?.profile_image_url 
+            || profile._json?.properties?.profile_image 
+            || "";
 
         let user = await User.findOne({ kakaoId });
+        
+        // 기존 사용자가 이메일로 존재하는 경우 연동
         if (!user && email) {
             user = await User.findOne({ email });
             if (user) {
                 user.kakaoId = kakaoId;
                 user.provider = "kakao";
+                // 이름이 없거나 기본값이면 카카오 닉네임으로 업데이트
+                if (!user.name || user.name === "미연동 계정" || user.name === "카카오유저") {
+                    user.name = nickname;
+                }
+                // 프로필 이미지도 업데이트
+                if (photoUrl) {
+                    user.profileImage = photoUrl;
+                }
                 await user.save();
             }
         }
+        
+        // 새 사용자 생성
         if (!user) {
             user = await User.create({
                 email: email || undefined,
-                name: displayName,
+                name: nickname,
                 kakaoId,
                 provider: "kakao",
-                profileImage: profile._json?.properties?.profile_image
+                profileImage: photoUrl
             });
+        } else {
+            // 기존 사용자의 이름이 없거나 기본값이면 카카오 닉네임으로 업데이트
+            if (!user.name || user.name === "미연동 계정" || user.name === "카카오유저") {
+                user.name = nickname;
+                await user.save();
+            }
+            // 프로필 이미지도 업데이트 (없는 경우에만)
+            if (photoUrl && !user.profileImage) {
+                user.profileImage = photoUrl;
+                await user.save();
+            }
         }
+        
         return done(null, user);
-    } catch (err) { return done(err); }
+    } catch (err) { 
+        console.error('❌ 카카오 로그인 에러:', err);
+        return done(err); 
+    }
 }));
 
 // (구글 전략 코드도 동일)

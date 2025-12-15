@@ -77,7 +77,11 @@ const Highlights = () => {
                     <span className="price">₩{hotel.price.toLocaleString()}</span>
                     <button
                       className="btn action-button"
-                      onClick={() => navigate(`/hotel/${hotel.id}`)}
+                      onClick={() => {
+                        navigate(`/hotel/${hotel.id}`);
+                        // 페이지 이동 시 스크롤 최상단으로 이동
+                        window.scrollTo({ top: 0, behavior: 'instant' });
+                      }}
                     >
                       숙소 예약 <FiArrowRight />
                     </button>

@@ -98,7 +98,11 @@ const HotelCard = ({ hotel }) => {
         </div>
         <button
           className="btn primary view-button"
-          onClick={() => navigate(`/hotel/${hotel.id}`)}
+          onClick={() => {
+            navigate(`/hotel/${hotel.id}`);
+            // 페이지 이동 시 스크롤 최상단으로 이동
+            window.scrollTo({ top: 0, behavior: 'instant' });
+          }}
         >
           보러가기
         </button>

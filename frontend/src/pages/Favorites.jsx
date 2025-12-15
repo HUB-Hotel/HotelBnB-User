@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import HotelCard from '../components/HotelCard';
 import Footer from '../components/Footer';
@@ -8,9 +9,21 @@ import { allHotelsData } from './SearchResults';
 import './style/Favorites.scss';
 
 const Favorites = () => {
+  const navigate = useNavigate();
   const [favorites, setFavorites] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // 로그인 상태 확인
+  useEffect(() => {
+    const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+    const token = localStorage.getItem('token');
+
+    if (!isLoggedIn || !token) {
+      navigate('/login', { replace: true });
+      return;
+    }
+  }, [navigate]);
 
   // API에서 찜한 숙소 목록 가져오기
   useEffect(() => {

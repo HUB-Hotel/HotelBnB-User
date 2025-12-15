@@ -51,6 +51,18 @@ export function getErrorMessage(error, fallback = '요청 처리 중 오류가 �
     return error.response.data.message;
   }
   
+  // MongoDB validation 에러 메시지 처리 (백엔드에서 변환되지 않은 경우)
+  if (error.message && error.message.includes('validation failed')) {
+    if (error.message.includes('name')) {
+      return '이름을 입력해주세요.';
+    } else if (error.message.includes('email')) {
+      return '이메일을 입력해주세요.';
+    } else if (error.message.includes('password')) {
+      return '비밀번호를 입력해주세요.';
+    }
+    return '입력한 정보를 확인해주세요.';
+  }
+  
   // 네트워크 에러
   if (error.message === 'Network Error' || error.code === 'ECONNABORTED') {
     return '서버에 연결할 수 없습니다. 네트워크 연결을 확인해주세요.';
@@ -68,6 +80,15 @@ export function getErrorMessage(error, fallback = '요청 처리 중 오류가 �
     return '요청한 정보를 찾을 수 없습니다.';
   } else if (status === 500) {
     return '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+  }
+  
+  // 원시 에러 메시지가 사용자에게 보이기 어려운 경우 필터링
+  if (error.message && (
+    error.message.includes('validation failed') ||
+    error.message.includes('Path') ||
+    error.message.includes('is required')
+  )) {
+    return '입력한 정보를 확인해주세요.';
   }
   
   return error.message || fallback;
