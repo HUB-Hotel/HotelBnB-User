@@ -17,7 +17,13 @@ const bookmarkRoutes = require("./src/bookmark/route");
 const paymentRoutes = require("./src/payment/route"); 
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+// Windows에서 포트 권한 문제가 있을 수 있으므로 더 높은 포트 사용
+const PORT = process.env.PORT || 5000;
+
+// 간단한 헬스 체크 엔드포인트 (라우트 등록 전)
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok', message: 'Server is running' });
+});
 
 // DB 연결
 connectDB();
@@ -44,4 +50,21 @@ app.use((err, req, res, next) => {
     res.status(500).json({ success: false, message: err.message });
 });
 
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+const server = app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`📍 Access at http://localhost:${PORT}`);
+    console.log(`📍 Health check: http://localhost:${PORT}/health`);
+});
+
+server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+        console.error(`❌ Port ${PORT} is already in use`);
+        console.error('다른 프로세스를 종료하거나 다른 포트를 사용하세요.');
+    } else if (err.code === 'EACCES') {
+        console.error(`❌ Permission denied for port ${PORT}`);
+        console.error('관리자 권한으로 실행하거나 다른 포트를 사용하세요.');
+    } else {
+        console.error('❌ Server error:', err);
+    }
+    process.exit(1);
+});

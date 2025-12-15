@@ -109,7 +109,7 @@ const SignUp = () => {
 
   // ✅ 소셜 로그인 핸들러
   const handleSocialLogin = (provider) => {
-    window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:3000/api'}/auth/${provider}`;
+    window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/auth/${provider}`;
   };
 
   return (

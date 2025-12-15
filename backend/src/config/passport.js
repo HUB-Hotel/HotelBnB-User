@@ -50,6 +50,11 @@ passport.use(new KakaoStrategy({
 }));
 
 // (구글 전략 코드도 동일)
+// 환경 변수 확인
+if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.GOOGLE_CALLBACK_URL) {
+    console.warn('⚠️ Google OAuth 환경 변수가 설정되지 않았습니다. Google 로그인이 작동하지 않을 수 있습니다.');
+}
+
 passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,

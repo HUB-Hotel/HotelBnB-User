@@ -11,6 +11,7 @@ import Login from './pages/Login';
 import SignUp from './pages/SignUp';
 import ForgotPassword from './pages/ForgotPassword';
 import Account from './pages/Account';
+import SocialLoginHandler from './pages/SocialLoginHandler';
 import QuickActions from './components/QuickActions';
 
 function App() {
@@ -28,6 +29,8 @@ function App() {
           <Route path="/signup" element={<SignUp />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/account" element={<Account />} />
+          <Route path="/oauth/google" element={<SocialLoginHandler />} />
+          <Route path="/oauth/kakao" element={<SocialLoginHandler />} />
         </Routes>
       </div>
       <QuickActions />
