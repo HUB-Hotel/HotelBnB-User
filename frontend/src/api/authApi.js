@@ -13,12 +13,17 @@ export const login = async ({ email, password }) => {
   return data;
 };
 
-// 회원가입
+// 회원가입 (수정됨)
 export const signup = async ({ name, email, phone, password }) => {
   const { data } = await api.post('/auth/register', {
-    displayName: name,
+    // 1. [중요] 백엔드는 'name'을 기다립니다. (displayName X)
+    name, 
+    
     email,
-    phone,
+    
+    // 2. [중요] 백엔드 에러 처리를 보니 'phoneNumber'를 기다립니다.
+    phoneNumber: phone, 
+    
     password,
   });
   return data;

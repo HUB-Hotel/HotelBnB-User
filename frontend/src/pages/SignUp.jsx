@@ -92,7 +92,7 @@ const SignUp = () => {
       const response = await signup({
         name,
         email: formData.email.trim(),
-        phone: formData.phone.trim(),
+        phoneNumber: formData.phone.trim(),
         password: formData.password,
       });
 
