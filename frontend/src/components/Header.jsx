@@ -125,14 +125,11 @@ const Header = () => {
     <header className="site-header">
       <div className="inner">
         <Link to="/" className="logo-link">
-          <div className="logo-mark">
-            <span className="logo-mark__initial">H</span>
-            <span className="logo-mark__dot" />
-          </div>
-          <div className="logo-text">
-            <h1 className="logo">HotelBnB</h1>
-            <span className="logo-tagline">Stay better with HotelBnB</span>
-          </div>
+          <img 
+            src="/HotelBnB.png" 
+            alt="HotelBnB Logo" 
+            className="logo-image"
+          />
         </Link>
         <div className="header-actions">
           {isLoggedIn ? (
