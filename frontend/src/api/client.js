@@ -1,7 +1,36 @@
 import axios from 'axios';
 
 // API 기본 URL (환경 변수에서 가져오거나 기본값 사용)
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+// 개발 환경에서는 localhost를 사용, 프로덕션에서는 환경 변수 사용
+const getBaseURL = () => {
+  // 환경 변수가 설정되어 있으면 사용
+  const envUrl = import.meta.env.VITE_API_URL;
+  
+  if (envUrl) {
+    // 환경 변수가 있으면 사용 (프로토콜이 없으면 추가)
+    if (envUrl.startsWith('http://') || envUrl.startsWith('https://')) {
+      // /api가 포함되어 있는지 확인
+      if (envUrl.endsWith('/api')) {
+        return envUrl;
+      }
+      // /api가 없으면 추가
+      return envUrl.endsWith('/') ? `${envUrl}api` : `${envUrl}/api`;
+    }
+    // 프로토콜이 없으면 https:// 추가하고 /api 확인
+    const urlWithProtocol = `https://${envUrl}`;
+    return urlWithProtocol.endsWith('/api') ? urlWithProtocol : `${urlWithProtocol}/api`;
+  }
+  
+  // 환경 변수가 없으면 개발 환경용 localhost 사용
+  return 'http://localhost:5000/api';
+};
+
+const BASE_URL = getBaseURL();
+
+// 디버깅: 개발 환경에서만 API URL 출력
+console.log('🔧 API Base URL:', BASE_URL);
+console.log('🔧 VITE_API_URL env:', import.meta.env.VITE_API_URL);
+console.log('🔧 import.meta.env.MODE:', import.meta.env.MODE);
 
 // axios 인스턴스 생성
 const api = axios.create({
@@ -19,6 +48,11 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    // 디버깅: 실제 요청 URL 출력
+    const fullUrl = config.baseURL ? `${config.baseURL}${config.url}` : config.url;
+    console.log('🔍 API Request:', config.method?.toUpperCase(), fullUrl);
+    console.log('🔍 Base URL:', config.baseURL);
+    console.log('🔍 Request URL:', config.url);
     return config;
   },
   (error) => {
