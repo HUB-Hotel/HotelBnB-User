@@ -3,6 +3,130 @@ require('dotenv').config({ path: path.join(__dirname, '../.env') });
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const connectDB = require('../src/config/db');
+const User = require('../src/auth/model');
+const Review = require('../src/review/model');
+const Booking = require('../src/booking/model');
+const Room = require('../src/room/model');
+
+// 리뷰 수를 100 이하의 랜덤 숫자로 생성하는 함수
+const generateRandomReviewCount = () => {
+  return Math.floor(Math.random() * 100) + 1; // 1~100
+};
+
+// 한국어 리뷰 템플릿
+const reviewTemplates = {
+  5: [
+    '정말 깔끔하고 편안한 숙소였습니다! 다음에도 또 이용하고 싶어요.',
+    '완벽한 숙박 경험이었습니다. 직원분들도 친절하시고 시설도 최고예요!',
+    '위치도 좋고 시설도 깔끔해서 만족스러웠습니다. 강력 추천합니다!',
+    '가격 대비 정말 좋은 숙소였어요. 다음에 또 오고 싶습니다.',
+    '침대가 너무 편안하고 방도 넓어서 좋았습니다. 완벽한 선택이었어요!',
+    '청결도가 뛰어나고 조용해서 푹 쉴 수 있었습니다. 최고예요!',
+    '서비스가 정말 훌륭했고 시설도 최신식이라 만족도가 높았습니다.',
+    '친절한 직원분들과 깔끔한 시설 덕분에 즐거운 여행이 되었어요.',
+    '위치가 중심가라 접근성이 좋고 주변 맛집도 많아서 좋았습니다.',
+    '가족 여행에 최적의 숙소였습니다. 아이들도 좋아했어요!'
+  ],
+  4: [
+    '전반적으로 만족스러운 숙소였습니다. 다음에도 이용할 의향이 있어요.',
+    '깔끔하고 편안했어요. 다만 조금 더 넓었으면 좋겠다는 생각이 들었습니다.',
+    '가격 대비 괜찮은 숙소였습니다. 위치도 나쁘지 않았어요.',
+    '시설은 좋은데 소음이 조금 있었던 게 아쉬웠습니다.',
+    '직원분들이 친절하시고 청결도는 좋았습니다. 추천해요!',
+    '침대가 편안하고 방도 깔끔했어요. 전반적으로 만족합니다.',
+    '위치가 좋아서 관광하기 편리했습니다. 시설도 나쁘지 않았어요.',
+    '가격 대비 괜찮은 선택이었습니다. 다음에도 고려해볼 만해요.',
+    '깔끔하고 조용해서 잘 쉬었습니다. 다만 주차 공간이 좀 아쉬웠어요.',
+    '전반적으로 좋은 숙소였습니다. 시설과 서비스 모두 만족스러웠어요.'
+  ],
+  3: [
+    '전반적으로 평범했습니다. 특별히 좋거나 나쁘지 않았어요.',
+    '가격 대비 그럭저럭 괜찮은 숙소였습니다. 크게 만족하지는 않았어요.',
+    '시설은 나쁘지 않았는데 직원 서비스가 조금 아쉬웠습니다.',
+    '위치는 좋은데 방이 생각보다 작았어요. 전반적으로 보통이었습니다.',
+    '청결도는 괜찮았는데 소음이 있어서 조금 불편했습니다.',
+    '예상했던 것보다는 조금 아쉬웠지만 나쁘지는 않았어요.',
+    '가격 대비 평범한 수준이었습니다. 특별한 점은 없었어요.',
+    '시설은 괜찮았는데 체크인 시간이 조금 늦어져서 아쉬웠습니다.',
+    '전반적으로 무난한 숙소였습니다. 크게 추천하거나 비추천하지는 않아요.',
+    '보통 수준의 숙소였어요. 가격 대비 그럭저럭 만족했습니다.'
+  ],
+  2: [
+    '시설이 좀 오래되어서 아쉬웠습니다. 청결도도 개선이 필요해 보였어요.',
+    '가격 대비 시설이 조금 아쉬웠습니다. 다음에는 다른 곳을 고려해볼게요.',
+    '소음이 많아서 푹 쉬기 어려웠어요. 위치는 괜찮았지만 시설이 아쉬웠습니다.',
+    '직원 서비스가 좀 아쉬웠고 시설도 예상보다 낮았어요.',
+    '청결도가 좀 아쉬웠고 방도 생각보다 작았습니다.',
+    '전반적으로 만족스럽지 않았어요. 가격 대비 시설이 아쉬웠습니다.',
+    '체크인 과정이 복잡했고 시설도 예상보다 낮았어요.',
+    '위치는 괜찮았는데 시설과 서비스가 아쉬웠습니다.',
+    '가격 대비 시설이 좀 아쉬웠어요. 다음에는 다른 곳을 찾아볼게요.',
+    '전반적으로 아쉬운 점이 많았습니다. 개선이 필요해 보였어요.'
+  ],
+  1: [
+    '시설이 너무 오래되어서 불편했습니다. 청결도도 많이 아쉬웠어요.',
+    '가격 대비 시설이 너무 낮았습니다. 다음에는 절대 이용하지 않을 것 같아요.',
+    '소음이 심해서 전혀 쉬지 못했습니다. 직원 서비스도 아쉬웠어요.',
+    '청결도가 매우 아쉬웠고 시설도 예상보다 훨씬 낮았습니다.',
+    '전반적으로 매우 불만족스러웠습니다. 추천하지 않아요.',
+    '체크인부터 문제가 많았고 시설도 너무 아쉬웠습니다.',
+    '가격 대비 시설이 너무 낮았어요. 다음에는 다른 곳을 찾겠습니다.',
+    '직원 서비스가 매우 아쉬웠고 시설도 개선이 많이 필요해 보였어요.',
+    '위치는 괜찮았지만 시설과 서비스가 모두 아쉬웠습니다.',
+    '전반적으로 매우 실망스러운 숙박 경험이었어요.'
+  ]
+};
+
+// 랜덤 리뷰 내용 생성
+const generateReviewContent = (rating) => {
+  const templates = reviewTemplates[rating] || reviewTemplates[3];
+  return templates[Math.floor(Math.random() * templates.length)];
+};
+
+// 랜덤 평점 생성 (5점 30%, 4점 40%, 3점 20%, 2점 7%, 1점 3%)
+const generateRandomRating = () => {
+  const rand = Math.random();
+  if (rand < 0.3) return 5;
+  if (rand < 0.7) return 4;
+  if (rand < 0.9) return 3;
+  if (rand < 0.97) return 2;
+  return 1;
+};
+
+// 리뷰용 User 생성 함수
+const generateReviewUser = async (index) => {
+  const name = koreanNames[Math.floor(Math.random() * koreanNames.length)];
+  const randomNum = Math.floor(Math.random() * 1000000) + index;
+  const email = `reviewer${randomNum}@${emailDomains[Math.floor(Math.random() * emailDomains.length)]}`;
+  
+  // 전화번호 생성
+  const phone1 = Math.floor(Math.random() * 9000) + 1000;
+  const phone2 = Math.floor(Math.random() * 9000) + 1000;
+  const phoneNumber = `010-${phone1}-${phone2}`;
+  
+  // 비밀번호 해시
+  const passwordHash = await bcrypt.hash('password123', 10);
+  
+  try {
+    const user = new User({
+      name,
+      email,
+      phoneNumber,
+      passwordHash,
+      role: 'user',
+      isActive: true,
+      provider: 'local'
+    });
+    
+    return await user.save();
+  } catch (error) {
+    // 이미 존재하는 이메일인 경우 기존 사용자 찾기
+    if (error.code === 11000) {
+      return await User.findOne({ email });
+    }
+    throw error;
+  }
+};
 
 // 하드코딩된 호텔 데이터 (SearchResults.jsx에서 복사)
 const allHotelsData = [
@@ -16,7 +140,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 5,
     reviewScore: 4.2,
-    reviewCount: 371,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -28,7 +152,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 5,
     reviewScore: 4.2,
-    reviewCount: 54,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -40,7 +164,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 5,
     reviewScore: 4.2,
-    reviewCount: 54,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -52,7 +176,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 5,
     reviewScore: 4.2,
-    reviewCount: 54,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1595576508898-0ad5c879a061?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -64,7 +188,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 4,
     reviewScore: 4.6,
-    reviewCount: 289,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1582719471384-894fbb16e074?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -76,7 +200,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 4,
     reviewScore: 4.4,
-    reviewCount: 167,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -88,7 +212,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 3,
     reviewScore: 4.0,
-    reviewCount: 98,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -100,7 +224,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 3,
     reviewScore: 3.8,
-    reviewCount: 76,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1582719471384-894fbb16e074?auto=format&fit=crop&w=800&q=80',
   },
   // 부산 호텔들
@@ -113,7 +237,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 4,
     reviewScore: 4.5,
-    reviewCount: 128,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -125,7 +249,7 @@ const allHotelsData = [
     type: 'resort',
     starRating: 4,
     reviewScore: 4.3,
-    reviewCount: 89,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -137,7 +261,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 5,
     reviewScore: 4.7,
-    reviewCount: 203,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -149,7 +273,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 4,
     reviewScore: 4.2,
-    reviewCount: 112,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -161,7 +285,7 @@ const allHotelsData = [
     type: 'motel',
     starRating: 3,
     reviewScore: 3.9,
-    reviewCount: 67,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1595576508898-0ad5c879a061?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -173,7 +297,7 @@ const allHotelsData = [
     type: 'motel',
     starRating: 2,
     reviewScore: 3.5,
-    reviewCount: 45,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=800&q=80',
   },
   // 도쿄 호텔들
@@ -186,7 +310,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 5,
     reviewScore: 4.7,
-    reviewCount: 245,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -198,7 +322,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 4,
     reviewScore: 4.4,
-    reviewCount: 156,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1595576508898-0ad5c879a061?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -210,7 +334,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 5,
     reviewScore: 4.6,
-    reviewCount: 198,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -222,7 +346,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 4,
     reviewScore: 4.3,
-    reviewCount: 134,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -234,7 +358,7 @@ const allHotelsData = [
     type: 'motel',
     starRating: 3,
     reviewScore: 4.0,
-    reviewCount: 87,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -246,7 +370,7 @@ const allHotelsData = [
     type: 'motel',
     starRating: 3,
     reviewScore: 3.8,
-    reviewCount: 65,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1595576508898-0ad5c879a061?auto=format&fit=crop&w=800&q=80',
   },
   // 추가 호텔 데이터
@@ -259,7 +383,7 @@ const allHotelsData = [
     type: 'motel',
     starRating: 2,
     reviewScore: 3.6,
-    reviewCount: 42,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -271,7 +395,7 @@ const allHotelsData = [
     type: 'resort',
     starRating: 5,
     reviewScore: 4.8,
-    reviewCount: 312,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -283,7 +407,7 @@ const allHotelsData = [
     type: 'motel',
     starRating: 2,
     reviewScore: 3.4,
-    reviewCount: 38,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -295,7 +419,7 @@ const allHotelsData = [
     type: 'resort',
     starRating: 5,
     reviewScore: 4.9,
-    reviewCount: 456,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1595576508898-0ad5c879a061?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -307,7 +431,7 @@ const allHotelsData = [
     type: 'motel',
     starRating: 2,
     reviewScore: 3.5,
-    reviewCount: 52,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -319,7 +443,7 @@ const allHotelsData = [
     type: 'resort',
     starRating: 5,
     reviewScore: 4.9,
-    reviewCount: 389,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -331,7 +455,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 5,
     reviewScore: 4.7,
-    reviewCount: 267,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -343,7 +467,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 3,
     reviewScore: 4.1,
-    reviewCount: 94,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1595576508898-0ad5c879a061?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -355,7 +479,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 4,
     reviewScore: 4.3,
-    reviewCount: 143,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -367,7 +491,7 @@ const allHotelsData = [
     type: 'resort',
     starRating: 4,
     reviewScore: 4.5,
-    reviewCount: 201,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=800&q=80',
   },
   // 평점 2점대 숙소들
@@ -380,7 +504,7 @@ const allHotelsData = [
     type: 'motel',
     starRating: 2,
     reviewScore: 2.3,
-    reviewCount: 23,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -392,7 +516,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 2,
     reviewScore: 2.5,
-    reviewCount: 31,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -404,7 +528,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 2,
     reviewScore: 2.7,
-    reviewCount: 28,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -416,7 +540,7 @@ const allHotelsData = [
     type: 'motel',
     starRating: 2,
     reviewScore: 2.1,
-    reviewCount: 19,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1595576508898-0ad5c879a061?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -428,7 +552,7 @@ const allHotelsData = [
     type: 'motel',
     starRating: 2,
     reviewScore: 2.4,
-    reviewCount: 25,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=800&q=80',
   },
   // 평점 3점대 숙소들
@@ -441,7 +565,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 3,
     reviewScore: 3.2,
-    reviewCount: 48,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -453,7 +577,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 3,
     reviewScore: 3.4,
-    reviewCount: 52,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -465,7 +589,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 3,
     reviewScore: 3.3,
-    reviewCount: 41,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1595576508898-0ad5c879a061?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -477,7 +601,7 @@ const allHotelsData = [
     type: 'motel',
     starRating: 3,
     reviewScore: 3.1,
-    reviewCount: 35,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -489,7 +613,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 3,
     reviewScore: 3.5,
-    reviewCount: 44,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -501,7 +625,7 @@ const allHotelsData = [
     type: 'motel',
     starRating: 3,
     reviewScore: 3.6,
-    reviewCount: 38,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -513,7 +637,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 3,
     reviewScore: 3.7,
-    reviewCount: 56,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1595576508898-0ad5c879a061?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -525,7 +649,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 3,
     reviewScore: 3.8,
-    reviewCount: 51,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=800&q=80',
   },
   // 오사카 호텔들
@@ -538,7 +662,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 4,
     reviewScore: 4.3,
-    reviewCount: 156,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -550,7 +674,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 4,
     reviewScore: 4.2,
-    reviewCount: 134,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -562,7 +686,7 @@ const allHotelsData = [
     type: 'resort',
     starRating: 5,
     reviewScore: 4.6,
-    reviewCount: 223,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -574,7 +698,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 3,
     reviewScore: 3.9,
-    reviewCount: 89,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1595576508898-0ad5c879a061?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -586,7 +710,7 @@ const allHotelsData = [
     type: 'motel',
     starRating: 2,
     reviewScore: 3.2,
-    reviewCount: 45,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=800&q=80',
   },
   // 파리 호텔들
@@ -599,7 +723,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 5,
     reviewScore: 4.7,
-    reviewCount: 312,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -611,7 +735,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 5,
     reviewScore: 4.8,
-    reviewCount: 456,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -623,7 +747,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 4,
     reviewScore: 4.4,
-    reviewCount: 198,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -635,7 +759,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 4,
     reviewScore: 4.3,
-    reviewCount: 167,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1595576508898-0ad5c879a061?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -647,7 +771,7 @@ const allHotelsData = [
     type: 'resort',
     starRating: 5,
     reviewScore: 4.9,
-    reviewCount: 389,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -659,7 +783,7 @@ const allHotelsData = [
     type: 'motel',
     starRating: 3,
     reviewScore: 3.7,
-    reviewCount: 78,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=800&q=80',
   },
   // 런던 호텔들
@@ -672,7 +796,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 5,
     reviewScore: 4.6,
-    reviewCount: 278,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -684,7 +808,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 5,
     reviewScore: 4.7,
-    reviewCount: 334,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -696,7 +820,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 4,
     reviewScore: 4.5,
-    reviewCount: 245,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -708,7 +832,7 @@ const allHotelsData = [
     type: 'resort',
     starRating: 5,
     reviewScore: 4.8,
-    reviewCount: 412,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1595576508898-0ad5c879a061?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -720,7 +844,7 @@ const allHotelsData = [
     type: 'motel',
     starRating: 3,
     reviewScore: 3.8,
-    reviewCount: 92,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=800&q=80',
   },
   // 뉴욕 호텔들
@@ -733,7 +857,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 5,
     reviewScore: 4.7,
-    reviewCount: 445,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -745,7 +869,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 5,
     reviewScore: 4.8,
-    reviewCount: 523,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -757,7 +881,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 4,
     reviewScore: 4.5,
-    reviewCount: 289,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -769,7 +893,7 @@ const allHotelsData = [
     type: 'resort',
     starRating: 5,
     reviewScore: 4.9,
-    reviewCount: 467,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1595576508898-0ad5c879a061?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -781,7 +905,7 @@ const allHotelsData = [
     type: 'motel',
     starRating: 3,
     reviewScore: 3.9,
-    reviewCount: 112,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=800&q=80',
   },
   // 멜버른 호텔들
@@ -794,7 +918,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 5,
     reviewScore: 4.6,
-    reviewCount: 267,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -806,7 +930,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 5,
     reviewScore: 4.7,
-    reviewCount: 312,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -818,7 +942,7 @@ const allHotelsData = [
     type: 'resort',
     starRating: 5,
     reviewScore: 4.8,
-    reviewCount: 356,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -830,7 +954,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 4,
     reviewScore: 4.3,
-    reviewCount: 178,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1595576508898-0ad5c879a061?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -842,7 +966,7 @@ const allHotelsData = [
     type: 'motel',
     starRating: 3,
     reviewScore: 3.8,
-    reviewCount: 87,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=800&q=80',
   },
   // 콜롬비아 호텔들
@@ -855,7 +979,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 4,
     reviewScore: 4.4,
-    reviewCount: 189,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -867,7 +991,7 @@ const allHotelsData = [
     type: 'resort',
     starRating: 5,
     reviewScore: 4.7,
-    reviewCount: 298,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -879,7 +1003,7 @@ const allHotelsData = [
     type: 'hotel',
     starRating: 4,
     reviewScore: 4.5,
-    reviewCount: 234,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=800&q=80',
   },
   {
@@ -891,7 +1015,7 @@ const allHotelsData = [
     type: 'motel',
     starRating: 3,
     reviewScore: 3.9,
-    reviewCount: 98,
+    reviewCount: generateRandomReviewCount(),
     image: 'https://images.unsplash.com/photo-1595576508898-0ad5c879a061?auto=format&fit=crop&w=800&q=80',
   },
 ];
@@ -1038,13 +1162,34 @@ const convertHotelToLodging = (hotel, businessId) => {
     amenityId: null,
     lat: coords.lat,
     lng: coords.lng,
-    rating: hotel.reviewScore || 0,
+    rating: 0, // 리뷰 생성 후 재계산
     reviewCount: hotel.reviewCount || 0,
     minPrice: hotel.price,
     maxGuests: 2 + Math.floor(Math.random() * 4), // 2~5명
     checkInTime: '15:00',
     checkOutTime: '11:00',
   };
+};
+
+// 각 숙소마다 Room 생성
+const createRoomForLodging = async (lodgingId, lodgingPrice) => {
+  const room = new Room({
+    lodgingId: lodgingId,
+    roomName: '스탠다드 룸',
+    roomSize: '25㎡',
+    capacityMin: 2,
+    capacityMax: 4,
+    checkInTime: '15:00',
+    checkOutTime: '11:00',
+    roomImage: '',
+    price: lodgingPrice,
+    countRoom: 10,
+    ownerDiscount: 0,
+    platformDiscount: 0,
+    status: 'active'
+  });
+  
+  return await room.save();
 };
 
 // 메인 실행 함수
@@ -1056,12 +1201,29 @@ const seedHotels = async () => {
     // 기존 데이터 확인
     const existingLodgings = await Lodging.countDocuments();
     const existingBusinessUsers = await BusinessUser.countDocuments();
+    const existingRooms = await Room.countDocuments();
+    const existingBookings = await Booking.countDocuments();
+    const existingReviews = await Review.countDocuments();
     
-    if (existingLodgings > 0 || existingBusinessUsers > 0) {
+    if (existingLodgings > 0 || existingBusinessUsers > 0 || existingRooms > 0 || existingBookings > 0 || existingReviews > 0) {
       console.log(`⚠️  기존 데이터가 있습니다:`);
       console.log(`   - 숙소: ${existingLodgings}개`);
       console.log(`   - 사업자: ${existingBusinessUsers}개`);
-      console.log('   스크립트를 계속 실행합니다...\n');
+      console.log(`   - 객실: ${existingRooms}개`);
+      console.log(`   - 예약: ${existingBookings}개`);
+      console.log(`   - 리뷰: ${existingReviews}개`);
+      console.log('\n🗑️  기존 데이터 삭제 중...');
+      
+      // 기존 데이터 삭제 (User는 실제 사용자일 수 있으므로 삭제하지 않음)
+      await Review.deleteMany({});
+      await Booking.deleteMany({});
+      await Room.deleteMany({});
+      await Lodging.deleteMany({});
+      await BusinessUser.deleteMany({});
+      
+      console.log('✅ 기존 데이터 삭제 완료\n');
+    } else {
+      console.log('📝 기존 데이터가 없습니다. 새로 생성합니다...\n');
     }
     
     const businessIds = [];
@@ -1088,10 +1250,95 @@ const seedHotels = async () => {
     console.log('\n🔄 숙소 데이터 삽입 중...');
     const insertedLodgings = await Lodging.insertMany(lodgings);
     
+    console.log(`\n✅ 숙소 생성 완료!`);
+    console.log(`📊 생성된 사업자: ${businessIds.length}개`);
+    console.log(`📊 생성된 숙소: ${insertedLodgings.length}개`);
+    
+    // 각 숙소마다 Room 생성 및 리뷰 생성
+    console.log('\n🔄 객실 및 리뷰 생성 중...');
+    let totalReviews = 0;
+    let totalBookings = 0;
+    
+    for (let i = 0; i < insertedLodgings.length; i++) {
+      const lodging = insertedLodgings[i];
+      const hotel = allHotelsData[i];
+      const reviewCount = hotel.reviewCount || 0;
+      
+      // Room 생성
+      const room = await createRoomForLodging(lodging._id, hotel.price);
+      
+      // 리뷰 생성
+      const reviews = [];
+      const bookings = [];
+      let totalRating = 0;
+      
+      for (let j = 0; j < reviewCount; j++) {
+        // User 생성
+        const user = await generateReviewUser(i * 1000 + j);
+        
+        // Booking 생성 (과거 날짜로 설정)
+        const daysAgo = Math.floor(Math.random() * 180) + 1; // 1~180일 전
+        const checkInDate = new Date();
+        checkInDate.setDate(checkInDate.getDate() - daysAgo - 2);
+        const checkOutDate = new Date(checkInDate);
+        checkOutDate.setDate(checkOutDate.getDate() + Math.floor(Math.random() * 3) + 1); // 1~3박
+        
+        const booking = new Booking({
+          userId: user._id,
+          lodgingId: lodging._id,
+          roomId: room._id,
+          userName: user.name,
+          userPhone: user.phoneNumber || '010-0000-0000',
+          checkIn: checkInDate,
+          checkOut: checkOutDate,
+          price: hotel.price,
+          status: 'confirmed',
+          paymentKey: `temp_${Date.now()}_${j}`,
+          paymentAmount: hotel.price,
+          isReviewed: true
+        });
+        
+        const savedBooking = await booking.save();
+        bookings.push(savedBooking);
+        
+        // Review 생성
+        const rating = generateRandomRating();
+        const review = new Review({
+          userId: user._id,
+          lodgingId: lodging._id,
+          bookingId: savedBooking._id,
+          rating: rating,
+          content: generateReviewContent(rating)
+        });
+        
+        const savedReview = await review.save();
+        reviews.push(savedReview);
+        totalRating += rating;
+        totalReviews++;
+      }
+      
+      // Lodging의 rating과 reviewCount 업데이트
+      if (reviewCount > 0) {
+        const averageRating = parseFloat((totalRating / reviewCount).toFixed(1));
+        await Lodging.findByIdAndUpdate(lodging._id, {
+          rating: averageRating,
+          reviewCount: reviewCount
+        });
+      }
+      
+      totalBookings += bookings.length;
+      
+      if ((i + 1) % 10 === 0 || i === insertedLodgings.length - 1) {
+        console.log(`✅ [${i + 1}/${insertedLodgings.length}] ${hotel.name} - 리뷰 ${reviewCount}개 생성 완료`);
+      }
+    }
+    
     console.log(`\n✅ 완료!`);
     console.log(`📊 생성된 사업자: ${businessIds.length}개`);
     console.log(`📊 생성된 숙소: ${insertedLodgings.length}개`);
-    console.log(`\n💡 모든 사업자의 기본 비밀번호: password123`);
+    console.log(`📊 생성된 예약: ${totalBookings}개`);
+    console.log(`📊 생성된 리뷰: ${totalReviews}개`);
+    console.log(`\n💡 모든 사업자/사용자의 기본 비밀번호: password123`);
     
     await mongoose.connection.close();
     process.exit(0);

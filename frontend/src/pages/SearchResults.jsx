@@ -1266,8 +1266,27 @@ export const allHotelsData = [
   },
 ];
 
+// 다양한 호텔 이미지 풀 (DB에 이미지가 없을 때 사용)
+const hotelImagePool = [
+  'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=800&q=80',
+  'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=800&q=80',
+  'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=800&q=80',
+  'https://images.unsplash.com/photo-1595576508898-0ad5c879a061?auto=format&fit=crop&w=800&q=80',
+  'https://images.unsplash.com/photo-1582719471384-894fbb16e074?auto=format&fit=crop&w=800&q=80',
+  'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800&q=80',
+  'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80',
+  'https://images.unsplash.com/photo-1611892440504-42a792e24d32?auto=format&fit=crop&w=800&q=80',
+  'https://images.unsplash.com/photo-1564501049412-61c2a3083791?auto=format&fit=crop&w=800&q=80',
+  'https://images.unsplash.com/photo-1571003123894-1f0594d2b5d9?auto=format&fit=crop&w=800&q=80',
+  'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?auto=format&fit=crop&w=800&q=80',
+  'https://images.unsplash.com/photo-1596436889106-be35e843f974?auto=format&fit=crop&w=800&q=80',
+  'https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=800&q=80',
+  'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800&q=80',
+  'https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&w=800&q=80',
+];
+
 // DB 데이터를 프론트엔드 형식으로 변환하는 함수
-const mapLodgingToHotel = (lodging) => {
+const mapLodgingToHotel = (lodging, index) => {
   // category를 type으로 변환 (한국어 → 영어)
   const categoryToType = {
     '호텔': 'hotel',
@@ -1302,6 +1321,16 @@ const mapLodgingToHotel = (lodging) => {
     return 'Poor';
   };
   
+  // 이미지 선택 로직: DB에 이미지가 있으면 사용, 없으면 풀에서 순환 선택
+  const getHotelImage = () => {
+    if (lodging.images && lodging.images.length > 0) {
+      // DB에 이미지가 있으면 첫 번째 이미지 사용
+      return lodging.images[0];
+    }
+    // DB에 이미지가 없으면 풀에서 인덱스 기반으로 선택 (각 호텔마다 다른 이미지)
+    return hotelImagePool[index % hotelImagePool.length];
+  };
+  
   const city = extractCity(lodging.address);
   const destination = `${city}, ${lodging.country}`;
   
@@ -1316,7 +1345,7 @@ const mapLodgingToHotel = (lodging) => {
     reviewScore: lodging.rating || 0,
     reviewCount: lodging.reviewCount || 0,
     reviewText: getReviewText(lodging.rating || 0),
-    image: lodging.images?.[0] || '',
+    image: getHotelImage(),
     imageCount: lodging.images?.length || 0,
     amenitiesCount: 10, // 기본값
   };
@@ -1333,6 +1362,8 @@ const SearchResults = () => {
   const [filterOptions, setFilterOptions] = useState({
     priceRange: [50000, 1200000],
     selectedRating: null,
+    selectedReviewCount: null,
+    selectedCountries: [],
   });
 
   // URL 쿼리 파라미터에서 검색 값 읽기
@@ -1354,8 +1385,8 @@ const SearchResults = () => {
         // API 응답 구조: { data: [...], message: "...", resultCode: 200, success: true }
         const lodgings = response?.data || [];
         
-        // DB 데이터를 프론트엔드 형식으로 변환
-        const mappedHotels = lodgings.map(mapLodgingToHotel);
+        // DB 데이터를 프론트엔드 형식으로 변환 (인덱스 전달하여 각 호텔마다 다른 이미지 할당)
+        const mappedHotels = lodgings.map((lodging, index) => mapLodgingToHotel(lodging, index));
         setHotels(mappedHotels);
       } catch (error) {
         console.error('호텔 데이터 로딩 실패:', error);
@@ -1441,6 +1472,19 @@ const SearchResults = () => {
       filtered = filtered.filter((hotel) => hotel.starRating >= filterOptions.selectedRating);
     }
 
+    // 리뷰 수 필터링 (최소 리뷰 수 이상)
+    if (filterOptions.selectedReviewCount !== null && filterOptions.selectedReviewCount !== undefined) {
+      filtered = filtered.filter((hotel) => hotel.reviewCount >= filterOptions.selectedReviewCount);
+    }
+
+    // 국가 필터링
+    if (filterOptions.selectedCountries && filterOptions.selectedCountries.length > 0) {
+      filtered = filtered.filter((hotel) => {
+        const hotelCountry = hotel.destination.split(',')[1]?.trim() || '';
+        return filterOptions.selectedCountries.includes(hotelCountry);
+      });
+    }
+
     // 정렬
     switch (sortBy) {
       case 'Price Low':
@@ -1504,9 +1548,22 @@ const SearchResults = () => {
       return hotel.price >= filterOptions.priceRange[0] && hotel.price <= filterOptions.priceRange[1];
     });
 
-    // 별점 필터링
+    // 별점 필터링 (최소 별점 이상)
     if (filterOptions.selectedRating !== null && filterOptions.selectedRating !== undefined) {
       filtered = filtered.filter((hotel) => hotel.starRating >= filterOptions.selectedRating);
+    }
+
+    // 리뷰 수 필터링 (최소 리뷰 수 이상)
+    if (filterOptions.selectedReviewCount !== null && filterOptions.selectedReviewCount !== undefined) {
+      filtered = filtered.filter((hotel) => hotel.reviewCount >= filterOptions.selectedReviewCount);
+    }
+
+    // 국가 필터링
+    if (filterOptions.selectedCountries && filterOptions.selectedCountries.length > 0) {
+      filtered = filtered.filter((hotel) => {
+        const hotelCountry = hotel.destination.split(',')[1]?.trim() || '';
+        return filterOptions.selectedCountries.includes(hotelCountry);
+      });
     }
 
     return filtered;
@@ -1563,37 +1620,20 @@ const SearchResults = () => {
       <SearchHeader />
       <div className="search-results-container">
         <aside className="filters-sidebar">
-          <SearchFilters onFilterChange={handleFilterChange} />
+          <SearchFilters 
+            onFilterChange={handleFilterChange}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            sortBy={sortBy}
+            onSortChange={setSortBy}
+            tabCounts={getTabCounts}
+          />
         </aside>
         <main className="results-main">
           <div className="results-header">
-            <div className="tabs">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  className={`tab-button ${activeTab === tab.id ? 'active' : ''}`}
-                  onClick={() => setActiveTab(tab.id)}
-                >
-                  {tab.label}
-                  <span className="tab-count">({tab.count}개)</span>
-                </button>
-              ))}
-            </div>
-            <div className="results-controls">
-              <span className="results-count">
-                {getTotalCount()}개 중 {currentHotels.length}개 표시
-              </span>
-              <select
-                className="sort-select"
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-              >
-                <option value="Recommended">추천순</option>
-                <option value="Price Low">가격: 낮은 순</option>
-                <option value="Price High">가격: 높은 순</option>
-                <option value="Rating">평점순</option>
-              </select>
-            </div>
+            <span className="results-count">
+              {getTotalCount()}개 중 {currentHotels.length}개 표시
+            </span>
           </div>
           <div className="hotels-list">
             {loading ? (
