@@ -6,6 +6,7 @@ import SearchHeader from '../components/SearchHeader';
 import SearchFilters from '../components/SearchFilters';
 import HotelCard from '../components/HotelCard';
 import Footer from '../components/Footer';
+import { searchHotels } from '../api/hotelApi';
 import './style/SearchResults.scss';
 
 // 더 많은 호텔 데이터 (도시별, 날짜별 다양성 추가)
@@ -1265,34 +1266,108 @@ export const allHotelsData = [
   },
 ];
 
+// DB 데이터를 프론트엔드 형식으로 변환하는 함수
+const mapLodgingToHotel = (lodging) => {
+  // category를 type으로 변환 (한국어 → 영어)
+  const categoryToType = {
+    '호텔': 'hotel',
+    '모텔': 'motel',
+    '리조트': 'resort',
+    '게스트하우스': 'hotel',
+    '에어비앤비': 'hotel'
+  };
+  
+  // address에서 도시 추출
+  const extractCity = (address) => {
+    if (!address) return '서울';
+    const addressLower = address.toLowerCase();
+    if (addressLower.includes('서울')) return '서울';
+    if (addressLower.includes('부산')) return '부산';
+    if (addressLower.includes('도쿄') || addressLower.includes('tokyo')) return '도쿄';
+    if (addressLower.includes('오사카') || addressLower.includes('osaka')) return '오사카';
+    if (addressLower.includes('파리') || addressLower.includes('paris')) return '파리';
+    if (addressLower.includes('런던') || addressLower.includes('london')) return '런던';
+    if (addressLower.includes('뉴욕') || addressLower.includes('new york')) return '뉴욕';
+    if (addressLower.includes('멜버른') || addressLower.includes('melbourne')) return '멜버른';
+    if (addressLower.includes('콜롬비아') || addressLower.includes('colombia')) return '콜롬비아';
+    return '서울'; // 기본값
+  };
+  
+  // 평점에 따른 reviewText 생성
+  const getReviewText = (rating) => {
+    if (rating >= 4.5) return 'Excellent';
+    if (rating >= 4.0) return 'Very Good';
+    if (rating >= 3.5) return 'Good';
+    if (rating >= 3.0) return 'Fair';
+    return 'Poor';
+  };
+  
+  const city = extractCity(lodging.address);
+  const destination = `${city}, ${lodging.country}`;
+  
+  return {
+    id: lodging._id.toString(),
+    name: lodging.lodgingName,
+    price: lodging.minPrice || 0,
+    address: lodging.address,
+    destination: destination,
+    type: categoryToType[lodging.category] || 'hotel',
+    starRating: lodging.starRating || 3,
+    reviewScore: lodging.rating || 0,
+    reviewCount: lodging.reviewCount || 0,
+    reviewText: getReviewText(lodging.rating || 0),
+    image: lodging.images?.[0] || '',
+    imageCount: lodging.images?.length || 0,
+    amenitiesCount: 10, // 기본값
+  };
+};
+
 const SearchResults = () => {
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('All');
   const [sortBy, setSortBy] = useState('Recommended');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 4;
+  const [hotels, setHotels] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [filterOptions, setFilterOptions] = useState({
     priceRange: [50000, 1200000],
     selectedRating: null,
-    freebies: {
-      breakfast: true,
-      parking: false,
-      wifi: true,
-      shuttle: false,
-      cancellation: false,
-    },
-    amenities: {
-      frontDesk: false,
-      aircon: false,
-      fitness: false,
-      pool: false,
-    },
   });
 
   // URL 쿼리 파라미터에서 검색 값 읽기
   const destination = searchParams.get('destination') || '서울, 대한민국';
   const checkIn = searchParams.get('checkIn');
   const checkOut = searchParams.get('checkOut');
+
+  // DB에서 호텔 데이터 가져오기
+  useEffect(() => {
+    const fetchHotels = async () => {
+      try {
+        setLoading(true);
+        const response = await searchHotels({
+          loc: destination.split(',')[0].trim(), // 도시만 추출
+          checkIn,
+          checkOut,
+        });
+        
+        // API 응답 구조: { data: [...], message: "...", resultCode: 200, success: true }
+        const lodgings = response?.data || [];
+        
+        // DB 데이터를 프론트엔드 형식으로 변환
+        const mappedHotels = lodgings.map(mapLodgingToHotel);
+        setHotels(mappedHotels);
+      } catch (error) {
+        console.error('호텔 데이터 로딩 실패:', error);
+        // 에러 발생 시 빈 배열
+        setHotels([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchHotels();
+  }, [destination, checkIn, checkOut]);
 
   // 필터 옵션 변경 핸들러 (useCallback으로 메모이제이션하여 무한 루프 방지)
   const handleFilterChange = useCallback((filters) => {
@@ -1301,7 +1376,7 @@ const SearchResults = () => {
 
   // 검색 조건에 따라 호텔 필터링
   const filteredHotels = useMemo(() => {
-    let filtered = [...allHotelsData];
+    let filtered = [...hotels];
 
     // 탭별 필터링 (All, Hotels, Motels, Resorts)
     if (activeTab !== 'All') {
@@ -1366,28 +1441,6 @@ const SearchResults = () => {
       filtered = filtered.filter((hotel) => hotel.starRating >= filterOptions.selectedRating);
     }
 
-    // 무료 서비스 필터링 (선택된 항목만 필터링)
-    const selectedFreebies = Object.entries(filterOptions.freebies)
-      .filter(([_, selected]) => selected)
-      .map(([key]) => key);
-    
-    if (selectedFreebies.length > 0) {
-      filtered = filtered.filter((hotel) => {
-        return selectedFreebies.every((freebie) => hotel.freebies?.[freebie]);
-      });
-    }
-
-    // 편의시설 필터링 (선택된 항목만 필터링)
-    const selectedAmenities = Object.entries(filterOptions.amenities)
-      .filter(([_, selected]) => selected)
-      .map(([key]) => key);
-    
-    if (selectedAmenities.length > 0) {
-      filtered = filtered.filter((hotel) => {
-        return selectedAmenities.every((amenity) => hotel.amenities?.[amenity]);
-      });
-    }
-
     // 정렬
     switch (sortBy) {
       case 'Price Low':
@@ -1405,11 +1458,11 @@ const SearchResults = () => {
     }
 
     return filtered;
-  }, [destination, checkIn, checkOut, sortBy, filterOptions, activeTab]);
+  }, [hotels, destination, checkIn, checkOut, sortBy, filterOptions, activeTab]);
 
   // 필터 옵션을 적용한 결과 (타입 필터링 제외) - 탭 개수 계산용
   const filteredHotelsForCounts = useMemo(() => {
-    let filtered = [...allHotelsData];
+    let filtered = [...hotels];
 
     // 도시별 필터링
     if (destination) {
@@ -1456,30 +1509,8 @@ const SearchResults = () => {
       filtered = filtered.filter((hotel) => hotel.starRating >= filterOptions.selectedRating);
     }
 
-    // 무료 서비스 필터링
-    const selectedFreebies = Object.entries(filterOptions.freebies)
-      .filter(([_, selected]) => selected)
-      .map(([key]) => key);
-    
-    if (selectedFreebies.length > 0) {
-      filtered = filtered.filter((hotel) => {
-        return selectedFreebies.every((freebie) => hotel.freebies?.[freebie]);
-      });
-    }
-
-    // 편의시설 필터링
-    const selectedAmenities = Object.entries(filterOptions.amenities)
-      .filter(([_, selected]) => selected)
-      .map(([key]) => key);
-    
-    if (selectedAmenities.length > 0) {
-      filtered = filtered.filter((hotel) => {
-        return selectedAmenities.every((amenity) => hotel.amenities?.[amenity]);
-      });
-    }
-
     return filtered;
-  }, [destination, checkIn, checkOut, filterOptions]);
+  }, [hotels, destination, checkIn, checkOut, filterOptions]);
 
   // 탭별 개수 계산 (필터 옵션 적용 후)
   const getTabCounts = useMemo(() => {
@@ -1565,7 +1596,11 @@ const SearchResults = () => {
             </div>
           </div>
           <div className="hotels-list">
-            {filteredHotels.length > 0 ? (
+            {loading ? (
+              <div className="loading">
+                <p>호텔 데이터를 불러오는 중...</p>
+              </div>
+            ) : filteredHotels.length > 0 ? (
               currentHotels.map((hotel) => (
                 <HotelCard key={hotel.id} hotel={hotel} />
               ))
