@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { DayPicker } from 'react-day-picker';
 import { addDays, format } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -299,6 +299,7 @@ const hotelFeatures = [
 
 const HotelDetail = () => {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [hotel, setHotel] = useState(null);
   const [hotelLoading, setHotelLoading] = useState(true);
@@ -346,11 +347,15 @@ const HotelDetail = () => {
         const hotelData = response.data || response.data?.data || response;
         
         if (hotelData) {
+          // URL 파라미터에서 가격 읽기 (Search 화면에서 전달된 가격)
+          const urlPrice = searchParams.get('price');
+          const displayPrice = urlPrice ? parseInt(urlPrice) : (hotelData.minPrice || 0);
+          
           // DB 데이터를 프론트엔드 형식에 맞게 변환
           const formattedHotel = {
             id: hotelData._id || hotelData.id || parseInt(id),
             name: hotelData.lodgingName || hotelData.name || '',
-            price: hotelData.price || 0,
+            price: displayPrice, // URL 파라미터의 가격 우선 사용, 없으면 minPrice
             address: hotelData.address || '',
             destination: hotelData.location || hotelData.destination || '',
             type: hotelData.type || 'hotel',

@@ -99,7 +99,8 @@ const HotelCard = ({ hotel }) => {
         <button
           className="btn primary view-button"
           onClick={() => {
-            navigate(`/hotel/${hotel.id}`);
+            // URL 파라미터로 가격 전달
+            navigate(`/hotel/${hotel.id}?price=${hotel.price}`);
             // 페이지 이동 시 스크롤 최상단으로 이동
             window.scrollTo({ top: 0, behavior: 'instant' });
           }}

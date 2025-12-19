@@ -6,7 +6,7 @@
 }
 
 .booking-container {
-  max-width: 120rem;
+  max-width: 180rem;
   margin: 0 auto;
   padding: 4rem 5%;
   display: grid;
@@ -654,6 +654,10 @@
   font-size: 1.4rem;
   font-weight: 600;
   color: var(--text);
+
+  .label-text {
+    display: inline-block;
+  }
 }
 
 .contact-input {
@@ -815,7 +819,9 @@
 .summary-actions {
   margin-top: 2rem;
   display: flex;
-  justify-content: flex-end;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.8rem;
 }
 
 .pay-button {

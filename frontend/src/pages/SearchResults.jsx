@@ -1334,12 +1334,26 @@ const mapLodgingToHotel = (lodging, index) => {
   const city = extractCity(lodging.address);
   const destination = `${city}, ${lodging.country}`;
   
+  // 객실 가격 배열에서 결정적 랜덤 선택 (호텔 ID 기반)
+  const roomPrices = lodging.roomPrices || [];
+  let selectedPrice = lodging.minPrice || 0;
+  
+  if (roomPrices.length > 0) {
+    // 호텔 ID를 시드로 사용하여 결정적 인덱스 생성
+    // 같은 호텔은 항상 같은 가격이 선택됨 (새로고침해도 동일)
+    const hotelId = lodging._id.toString();
+    const seed = hotelId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const randomIndex = seed % roomPrices.length;
+    selectedPrice = roomPrices[randomIndex];
+  }
+  
   return {
     id: lodging._id.toString(),
     name: lodging.lodgingName,
-    price: lodging.minPrice || 0,
+    price: selectedPrice, // 랜덤으로 선택된 가격 사용
     address: lodging.address,
     destination: destination,
+    country: lodging.country || '', // 국가 필드 추가 (필터링용)
     type: categoryToType[lodging.category] || 'hotel',
     starRating: lodging.starRating || 3,
     reviewScore: lodging.rating || 0,
@@ -1367,7 +1381,7 @@ const SearchResults = () => {
   });
 
   // URL 쿼리 파라미터에서 검색 값 읽기
-  const destination = searchParams.get('destination') || '서울, 대한민국';
+  const destination = searchParams.get('destination') || '';
   const checkIn = searchParams.get('checkIn');
   const checkOut = searchParams.get('checkOut');
 
@@ -1376,8 +1390,10 @@ const SearchResults = () => {
     const fetchHotels = async () => {
       try {
         setLoading(true);
+        // destination이 있으면 도시만 추출, 없으면 빈 문자열 (모든 호텔 조회)
+        const loc = destination ? destination.split(',')[0].trim() : '';
         const response = await searchHotels({
-          loc: destination.split(',')[0].trim(), // 도시만 추출
+          loc: loc || undefined, // 빈 문자열이면 undefined로 전달하여 모든 호텔 조회
           checkIn,
           checkOut,
         });
@@ -1423,8 +1439,8 @@ const SearchResults = () => {
       });
     }
 
-    // 도시별 필터링
-    if (destination) {
+    // 도시별 필터링 (destination이 있을 때만)
+    if (destination && destination.trim()) {
       const destinationCity = destination.toLowerCase().split(',')[0].trim();
       filtered = filtered.filter((hotel) => {
         // 도시 이름이 포함되어 있는지 확인
@@ -1480,7 +1496,8 @@ const SearchResults = () => {
     // 국가 필터링
     if (filterOptions.selectedCountries && filterOptions.selectedCountries.length > 0) {
       filtered = filtered.filter((hotel) => {
-        const hotelCountry = hotel.destination.split(',')[1]?.trim() || '';
+        // hotel.country를 직접 사용 (더 안정적)
+        const hotelCountry = hotel.country || hotel.destination.split(',')[1]?.trim() || '';
         return filterOptions.selectedCountries.includes(hotelCountry);
       });
     }
@@ -1508,8 +1525,8 @@ const SearchResults = () => {
   const filteredHotelsForCounts = useMemo(() => {
     let filtered = [...hotels];
 
-    // 도시별 필터링
-    if (destination) {
+    // 도시별 필터링 (destination이 있을 때만)
+    if (destination && destination.trim()) {
       const destinationCity = destination.toLowerCase().split(',')[0].trim();
       filtered = filtered.filter((hotel) => {
         const hotelCity = hotel.destination.toLowerCase().split(',')[0].trim();
@@ -1561,7 +1578,8 @@ const SearchResults = () => {
     // 국가 필터링
     if (filterOptions.selectedCountries && filterOptions.selectedCountries.length > 0) {
       filtered = filtered.filter((hotel) => {
-        const hotelCountry = hotel.destination.split(',')[1]?.trim() || '';
+        // hotel.country를 직접 사용 (더 안정적)
+        const hotelCountry = hotel.country || hotel.destination.split(',')[1]?.trim() || '';
         return filterOptions.selectedCountries.includes(hotelCountry);
       });
     }

@@ -1,6 +1,7 @@
 // backend/src/lodging/controller.js
 
 const Lodging = require("./model");
+const Room = require("../room/model");
 const { successResponse, errorResponse } = require("../common/response");
 
 // 1. 숙소 목록 조회 (검색 기능 포함)
@@ -34,7 +35,27 @@ exports.getLodgings = async (req, res) => {
 
     const lodgings = await Lodging.find(query);
 
-    res.status(200).json(successResponse(lodgings || [], `${lodgings.length}개 발견`));
+    // 각 호텔의 객실 가격 배열 추가
+    const lodgingsWithRoomPrices = await Promise.all(
+      lodgings.map(async (lodging) => {
+        // 해당 호텔의 활성 객실들의 가격만 가져오기
+        const rooms = await Room.find({
+          lodgingId: lodging._id,
+          status: 'active'
+        }).select('price').lean();
+
+        // 객실 가격 배열 생성 (중복 제거 및 정렬)
+        const roomPrices = [...new Set(rooms.map(r => r.price))].sort((a, b) => a - b);
+
+        // lodging 객체에 roomPrices 필드 추가
+        const lodgingObj = lodging.toObject();
+        lodgingObj.roomPrices = roomPrices.length > 0 ? roomPrices : [lodging.minPrice || 0];
+
+        return lodgingObj;
+      })
+    );
+
+    res.status(200).json(successResponse(lodgingsWithRoomPrices || [], `${lodgingsWithRoomPrices.length}개 발견`));
 
   } catch (err) {
     res.status(500).json(errorResponse(err.message || "숙소 목록 조회 실패", 500));

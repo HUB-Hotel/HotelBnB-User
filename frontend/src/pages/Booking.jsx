@@ -4,9 +4,8 @@ import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { FiMapPin, FiCalendar, FiUsers, FiCreditCard, FiPlus } from 'react-icons/fi';
 import { createBooking } from '../api/bookingApi';
-import { getRooms } from '../api/hotelApi';
+import { getRooms, getHotelDetail } from '../api/hotelApi';
 import { getErrorMessage } from '../api/client';
-import { allHotelsData } from './SearchResults';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import './style/Booking.scss';
@@ -45,6 +44,8 @@ const Booking = () => {
   const [error, setError] = useState('');
   const [actualRoom, setActualRoom] = useState(null);
   const [loadingRoom, setLoadingRoom] = useState(false);
+  const [hotel, setHotel] = useState(null);
+  const [hotelLoading, setHotelLoading] = useState(true);
   const [userInfo, setUserInfo] = useState(null);
   const [newCard, setNewCard] = useState({
     cardNumber: '',
@@ -56,8 +57,44 @@ const Booking = () => {
   });
   const isEditing = !isSummaryVisible;
 
-  const hotel = useMemo(() => {
-    return allHotelsData.find((h) => h.id === parseInt(id));
+  // DB에서 호텔 정보 가져오기
+  useEffect(() => {
+    const loadHotel = async () => {
+      if (!id) return;
+      
+      setHotelLoading(true);
+      try {
+        const response = await getHotelDetail(id);
+        const hotelData = response?.data || response;
+        
+        if (hotelData) {
+          // DB 데이터를 프론트엔드 형식에 맞게 변환
+          const formattedHotel = {
+            id: hotelData._id || hotelData.id || id,
+            name: hotelData.lodgingName || hotelData.name || '',
+            price: hotelData.minPrice || 0,
+            address: hotelData.address || '',
+            destination: `${hotelData.address?.split(',')[0] || '서울'}, ${hotelData.country || '대한민국'}`,
+            type: hotelData.type || 'hotel',
+            starRating: hotelData.starRating || 5,
+            amenitiesCount: hotelData.amenities?.length || 0,
+            reviewScore: hotelData.rating || hotelData.averageRating || 0,
+            reviewText: hotelData.rating >= 4.5 ? 'Excellent' : hotelData.rating >= 4.0 ? 'Very Good' : hotelData.rating >= 3.5 ? 'Good' : 'Fair',
+            reviewCount: hotelData.reviewCount || 0,
+            image: hotelData.images?.[0] || hotelData.image || '',
+            imageCount: hotelData.images?.length || 0,
+          };
+          setHotel(formattedHotel);
+        }
+      } catch (error) {
+        console.error('호텔 데이터 로딩 실패:', error);
+        setHotel(null);
+      } finally {
+        setHotelLoading(false);
+      }
+    };
+    
+    loadHotel();
   }, [id]);
 
   // 실제 Room API에서 데이터 가져오기
@@ -341,6 +378,24 @@ const Booking = () => {
       return;
     }
 
+    // 핸드폰 번호 필수 검증
+    if (!phoneNumber || phoneNumber.trim() === '') {
+      setError('핸드폰 번호를 입력해주세요.');
+      return;
+    }
+
+    // 핸드폰 번호 형식 검증 (11자리 숫자)
+    if (phoneNumber.length !== 11) {
+      setError('핸드폰 번호를 올바르게 입력해주세요. (11자리)');
+      return;
+    }
+
+    // 결제 방법 필수 검증
+    if (!selectedCard || selectedCard.trim() === '') {
+      setError('결제 방법을 선택해주세요.');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setError('');
@@ -402,6 +457,18 @@ const Booking = () => {
       setIsSubmitting(false);
     }
   };
+
+  if (hotelLoading) {
+    return (
+      <div className="booking-page">
+        <Header />
+        <div className="not-found">
+          <p>호텔 정보를 불러오는 중...</p>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   if (!hotel) {
     return (
@@ -476,7 +543,7 @@ const Booking = () => {
 
           {/* Payment Method */}
           <div className="payment-method-section">
-            <h2 className="section-title">결제 방법</h2>
+            <h2 className="section-title">결제 방법 <span style={{ color: 'red' }}>*</span></h2>
             <div className="payment-methods">
               {paymentMethods.map((method) => (
                 <label className="payment-method" key={method.id}>
@@ -545,7 +612,7 @@ const Booking = () => {
           <div className="contact-info-section">
             <h2 className="section-title">예약자 연락처</h2>
             <label className="contact-input-label">
-              핸드폰 번호
+              <span className="label-text">핸드폰 번호 <span style={{ color: 'red' }}>*</span></span>
               <input
                 className="contact-input"
                 type="tel"
@@ -632,12 +699,22 @@ const Booking = () => {
             <div className="summary-actions">
               <button
                 className="btn primary pay-button"
-                disabled={isEditing}
+                disabled={isEditing || !phoneNumber || phoneNumber.length !== 11 || !selectedCard}
                 onClick={() => setIsPaymentModalOpen(true)}
-                data-state={isEditing ? 'disabled' : 'enabled'}
+                data-state={isEditing || !phoneNumber || phoneNumber.length !== 11 || !selectedCard ? 'disabled' : 'enabled'}
               >
                 결제하기
               </button>
+              {(!phoneNumber || phoneNumber.length !== 11) && (
+                <p style={{ color: 'red', fontSize: '1.2rem', marginTop: '0.8rem', textAlign: 'center' }}>
+                  핸드폰 번호를 입력해주세요. (11자리)
+                </p>
+              )}
+              {phoneNumber && phoneNumber.length === 11 && !selectedCard && (
+                <p style={{ color: 'red', fontSize: '1.2rem', marginTop: '0.8rem', textAlign: 'center' }}>
+                  결제 방법을 선택해주세요.
+                </p>
+              )}
             </div>
           </div>
         </div>
