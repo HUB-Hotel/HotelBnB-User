@@ -70,6 +70,14 @@ const Login = () => {
             <h1 className="auth-title">Login</h1>
             <p className="auth-subtitle">로그인해주세요</p>
 
+            <div className="test-account-box">
+              <div className="test-account-label">테스트 계정</div>
+              <div className="test-account-info">
+                <div>이메일: user@test.com</div>
+                <div>비밀번호: user123</div>
+              </div>
+            </div>
+
             <form onSubmit={handleSubmit} className="auth-form">
               <div className="form-group">
                 <label htmlFor="email">Email</label>

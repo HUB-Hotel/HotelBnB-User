@@ -55,6 +55,29 @@
     margin: 0 0 2rem 0;
   }
 
+  .test-account-box {
+    background: #e8f5e9;
+    border-radius: 0.8rem;
+    padding: 1.2rem 1.6rem;
+    margin-bottom: 2rem;
+
+    .test-account-label {
+      font-size: 1.3rem;
+      font-weight: 600;
+      color: #2c4c40;
+      margin-bottom: 0.8rem;
+    }
+
+    .test-account-info {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      font-size: 1.3rem;
+      color: #1e3e35;
+      line-height: 1.6;
+    }
+  }
+
   .auth-form {
     display: flex;
     flex-direction: column;

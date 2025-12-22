@@ -14,7 +14,8 @@ const roomRoutes = require("./src/room/route");
 const bookingRoutes = require("./src/booking/route");
 const reviewRoutes = require("./src/review/route");
 const bookmarkRoutes = require("./src/bookmark/route");
-const paymentRoutes = require("./src/payment/route"); 
+const paymentRoutes = require("./src/payment/route");
+const couponRoutes = require("./src/coupon/route"); 
 
 const app = express();
 // Windows에서 포트 권한 문제가 있을 수 있으므로 더 높은 포트 사용
@@ -42,6 +43,7 @@ app.use("/api/bookings", bookingRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/bookmarks", bookmarkRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/coupons", couponRoutes);
 
 // 에러 핸들링
 app.use((req, res, next) => res.status(404).json({ success: false, message: 'Not Found' }));

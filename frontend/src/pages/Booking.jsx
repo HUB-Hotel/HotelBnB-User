@@ -6,6 +6,7 @@ import { FiMapPin, FiCalendar, FiUsers, FiCreditCard, FiPlus } from 'react-icons
 import { createBooking } from '../api/bookingApi';
 import { getRooms, getHotelDetail } from '../api/hotelApi';
 import { getErrorMessage } from '../api/client';
+import { validateCoupon } from '../api/couponApi';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import './style/Booking.scss';
@@ -26,6 +27,8 @@ const Booking = () => {
   const [couponCode, setCouponCode] = useState('');
   const [couponMessage, setCouponMessage] = useState('');
   const [discountAmount, setDiscountAmount] = useState(0);
+  const [isCouponValidating, setIsCouponValidating] = useState(false);
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [isSummaryVisible, setIsSummaryVisible] = useState(false);
 
   // 로그인 상태 확인
@@ -215,25 +218,40 @@ const Booking = () => {
     setCouponMessage('');
     setDiscountAmount(0);
     setPhoneNumber('');
+    setAppliedCoupon(null);
   }, [roomId]);
-  const handleApplyCoupon = () => {
+  const handleApplyCoupon = async () => {
     const trimmedCode = couponCode.trim();
     if (!trimmedCode) {
       setCouponMessage('쿠폰 코드를 입력해주세요.');
       setDiscountAmount(0);
+      setAppliedCoupon(null);
       return;
     }
 
-    const upperCode = trimmedCode.toUpperCase();
-    const isKoreanDiscount = trimmedCode === '할인';
+    setIsCouponValidating(true);
+    setCouponMessage('');
 
-    if (upperCode === 'WELCOME10' || isKoreanDiscount) {
-      const newDiscount = Math.floor(baseFare * 0.1);
-      setDiscountAmount(newDiscount);
-      setCouponMessage('10% 할인 쿠폰이 적용되었습니다.');
-    } else {
+    try {
+      const response = await validateCoupon(trimmedCode, baseFare);
+      
+      if (response.success && response.data) {
+        const { discountAmount: discount, coupon, finalAmount } = response.data;
+        setDiscountAmount(discount);
+        setAppliedCoupon(coupon);
+        setCouponMessage(`${coupon.name} 쿠폰이 적용되었습니다. (${discount.toLocaleString()}원 할인)`);
+      } else {
+        setDiscountAmount(0);
+        setAppliedCoupon(null);
+        setCouponMessage(response.message || '쿠폰 적용에 실패했습니다.');
+      }
+    } catch (error) {
+      const errorMsg = getErrorMessage(error, '쿠폰 검증 중 오류가 발생했습니다.');
       setDiscountAmount(0);
-      setCouponMessage('사용할 수 없는 쿠폰입니다.');
+      setAppliedCoupon(null);
+      setCouponMessage(errorMsg);
+    } finally {
+      setIsCouponValidating(false);
     }
   };
 
@@ -596,9 +614,9 @@ const Booking = () => {
               <button
                 className="btn primary coupon-button"
                 onClick={handleApplyCoupon}
-                disabled={!isEditing}
+                disabled={!isEditing || isCouponValidating}
               >
-                적용
+                {isCouponValidating ? '확인 중...' : '적용'}
               </button>
             </div>
             {couponMessage && (
