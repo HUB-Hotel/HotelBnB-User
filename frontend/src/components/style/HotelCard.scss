@@ -175,7 +175,7 @@
 
 .hotel-reviews {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 0.8rem;
   margin: 0.4rem 0;
 }
@@ -184,17 +184,20 @@
   font-size: 1.6rem;
   font-weight: 700;
   color: var(--primary);
+  line-height: 1.5;
 }
 
 .review-text {
   font-size: 1.4rem;
   color: var(--text);
   font-weight: 600;
+  line-height: 1.5;
 }
 
 .review-count {
   font-size: 1.4rem;
   color: var(--muted);
+  line-height: 1.5;
 }
 
 .view-button {
