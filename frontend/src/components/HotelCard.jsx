@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiHeart } from 'react-icons/fi';
+import { getFavorites, addFavorite, removeFavorite } from '../api/favoriteApi';
+import { getErrorMessage } from '../api/client';
 import './style/HotelCard.scss';
 
 const HotelCard = ({ hotel }) => {
@@ -9,10 +11,26 @@ const HotelCard = ({ hotel }) => {
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
 
-  // localStorage에서 찜한 숙소 목록 불러오기
+  // API에서 찜한 목록 확인
   useEffect(() => {
-    const favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
-    setIsFavorited(favorites.includes(hotel.id));
+    const checkFavoriteStatus = async () => {
+      try {
+        const response = await getFavorites();
+        const favoritesData = response.data || response.data?.data || response || [];
+        const favoriteIds = Array.isArray(favoritesData)
+          ? favoritesData.map(item => item.lodgingId || item.lodging?._id || item._id || item)
+          : [];
+        const hotelIdStr = hotel.id.toString();
+        setIsFavorited(favoriteIds.some(id => id.toString() === hotelIdStr));
+      } catch (err) {
+        console.error('Failed to check favorite status', err);
+        // localStorage에서 fallback
+        const favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
+        setIsFavorited(favorites.includes(hotel.id));
+      }
+    };
+
+    checkFavoriteStatus();
   }, [hotel.id]);
 
   // 기본 이미지 URL
@@ -28,20 +46,20 @@ const HotelCard = ({ hotel }) => {
     setImageLoading(false);
   };
 
-  const handleHeartClick = (e) => {
+  const handleHeartClick = async (e) => {
     e.stopPropagation();
-    const favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
-
-    if (isFavorited) {
-      // 찜 해제
-      const updatedFavorites = favorites.filter((id) => id !== hotel.id);
-      localStorage.setItem('favorites', JSON.stringify(updatedFavorites));
-      setIsFavorited(false);
-    } else {
-      // 찜하기
-      const updatedFavorites = [...favorites, hotel.id];
-      localStorage.setItem('favorites', JSON.stringify(updatedFavorites));
-      setIsFavorited(true);
+    
+    try {
+      if (isFavorited) {
+        await removeFavorite(hotel.id.toString());
+        setIsFavorited(false);
+      } else {
+        await addFavorite(hotel.id.toString());
+        setIsFavorited(true);
+      }
+    } catch (err) {
+      console.error('Failed to toggle favorite', err);
+      alert(getErrorMessage(err, '찜하기 기능을 사용할 수 없습니다.'));
     }
   };
 

@@ -1,16 +1,15 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import HotelCard from '../components/HotelCard';
 import Footer from '../components/Footer';
 import { getFavorites } from '../api/favoriteApi';
 import { getErrorMessage } from '../api/client';
-import { allHotelsData } from './SearchResults';
 import './style/Favorites.scss';
 
 const Favorites = () => {
   const navigate = useNavigate();
-  const [favorites, setFavorites] = useState([]);
+  const [favoriteHotels, setFavoriteHotels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -34,18 +33,47 @@ const Favorites = () => {
         // Backend 응답: { data: [...], message: "...", resultCode: 200 }
         const favoritesData = response.data || response.data?.data || response || [];
         
-        // lodgingId 배열로 변환
-        const favoriteIds = Array.isArray(favoritesData) 
-          ? favoritesData.map(item => item.lodgingId || item.lodging?._id || item._id)
+        // 백엔드에서 populate된 lodging 정보 사용
+        const lodgings = Array.isArray(favoritesData) 
+          ? favoritesData.map(item => item.lodging || item)
           : [];
         
-        setFavorites(favoriteIds);
+        // reviewText 생성 함수
+        const getReviewText = (rating) => {
+          if (rating >= 4.5) return 'Excellent';
+          if (rating >= 4) return 'Very Good';
+          if (rating >= 3) return 'Good';
+          return 'Fair';
+        };
+        
+        // Lodging 데이터를 Hotel 형식으로 변환
+        const hotels = lodgings
+          .filter(lodging => lodging && lodging.lodgingName) // null 제거
+          .map((lodging) => {
+            const city = lodging.address?.split(' ')[0] || '';
+            
+            return {
+              id: lodging._id.toString(),
+              name: lodging.lodgingName,
+              price: lodging.minPrice || 0,
+              address: lodging.address,
+              destination: `${city}, ${lodging.country}`,
+              type: lodging.category || 'hotel',
+              starRating: lodging.starRating || 3,
+              reviewScore: lodging.rating || 0,
+              reviewCount: lodging.reviewCount || 0,
+              reviewText: getReviewText(lodging.rating || 0),
+              image: lodging.images?.[0] || '',
+              imageCount: lodging.images?.length || 0,
+              amenitiesCount: 10,
+              country: lodging.country,
+            };
+          });
+        
+        setFavoriteHotels(hotels);
       } catch (err) {
         console.error('Failed to load favorites', err);
         setError(getErrorMessage(err, '찜한 숙소를 불러오는데 실패했습니다.'));
-        // localStorage에서 fallback
-        const stored = JSON.parse(localStorage.getItem('favorites') || '[]');
-        setFavorites(stored);
       } finally {
         setLoading(false);
       }
@@ -53,11 +81,6 @@ const Favorites = () => {
 
     loadFavorites();
   }, []);
-
-  // 찜한 숙소 필터링
-  const favoriteHotels = useMemo(() => {
-    return allHotelsData.filter((hotel) => favorites.includes(hotel.id));
-  }, [favorites]);
 
   return (
     <div className="favorites-page">
