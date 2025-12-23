@@ -11,6 +11,7 @@ const userSchema = new mongoose.Schema(
             trim: true,
             match: [EMAIL_REGEX, "유효한 이메일"],
             unique: true,
+            sparse: true, // null 값은 인덱스에서 제외 (소셜 로그인 사용자용)
             required: function () {
                 return this.provider === 'local';
             }
